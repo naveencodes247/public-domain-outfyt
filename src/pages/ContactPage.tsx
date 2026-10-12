@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Send, CheckCircle2 } from 'lucide-react';
+import { Send, CheckCircle2, Mail, MessageSquare } from 'lucide-react';
 
 export const ContactPage: React.FC = () => {
   const [submitted, setSubmitted] = useState(false);
@@ -17,20 +17,56 @@ export const ContactPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
+      {/* Page Title */}
       <div className="space-y-2">
-        <span className="text-xs uppercase tracking-widest text-[#A77B3D] font-semibold">
-          Get in Touch
+        <span className="text-xs uppercase tracking-widest text-[#A77B3D] font-semibold flex items-center gap-1.5">
+          <MessageSquare className="w-3.5 h-3.5 text-[#CDA66B]" />
+          <span>Get in Touch</span>
         </span>
-        <h1 className="font-editorial text-4xl font-bold text-[#171717] tracking-tight">
-          Contact OutFyt.co.in
+        <h1 className="font-editorial text-4xl sm:text-5xl font-bold text-[#171717] tracking-tight">
+          Contact & Feedback
         </h1>
-        <p className="text-sm text-[#66615B]">
-          Have an outfit recommendation, stylist partnership inquiry, or brand feedback? Send us a message below.
+        <p className="text-sm text-[#66615B] max-w-xl">
+          Have an outfit recommendation, retailer correction, styling inquiry, or general feedback? We would love to hear from you.
         </p>
       </div>
 
+      {/* Direct Email Support Card */}
+      <div className="p-6 rounded-2xl bg-[#FFFFFF] border border-[#E5DDD0] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-xl bg-[#F7F3EB] border border-[#E5DDD0] flex items-center justify-center text-[#CDA66B] shrink-0">
+            <Mail className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-xs font-semibold text-[#171717] block">
+              Direct Editorial & Support Email
+            </span>
+            <p className="text-xs text-[#66615B] mt-0.5">
+              For fastest response, email our team directly anytime:
+            </p>
+          </div>
+        </div>
+        <a
+          href="mailto:supportoutfyt.co.in@gmail.com"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#F7F3EB] hover:bg-[#EFE6D8] border border-[#E5DDD0] hover:border-[#CDA66B] text-[#171717] text-xs font-semibold transition shrink-0 group"
+        >
+          <Mail className="w-3.5 h-3.5 text-[#A77B3D]" />
+          <span className="group-hover:text-[#A77B3D] transition-colors">
+            supportoutfyt.co.in@gmail.com
+          </span>
+        </a>
+      </div>
+
+      {/* Contact Form Card */}
       <div className="p-8 rounded-2xl bg-[#FFFFFF] border border-[#E5DDD0] shadow-xs">
+        <h2 className="text-base font-semibold text-[#171717] mb-1">
+          Send Us a Note
+        </h2>
+        <p className="text-xs text-[#66615B] mb-6">
+          Fill out the form below and our team will get back to you.
+        </p>
+
         {submitted ? (
           <div className="text-center py-8 space-y-3">
             <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto border border-emerald-200">
@@ -45,7 +81,7 @@ export const ContactPage: React.FC = () => {
                 setSubmitted(false);
                 setFormData({ name: '', email: '', subject: '', message: '' });
               }}
-              className="text-xs text-[#A77B3D] hover:underline font-semibold pt-2"
+              className="text-xs text-[#A77B3D] hover:underline font-semibold pt-2 cursor-pointer"
             >
               Send Another Note
             </button>
@@ -54,7 +90,7 @@ export const ContactPage: React.FC = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-[#171717]">Your Name</label>
+                <label className="text-xs font-medium text-[#171717]">Your Name *</label>
                 <input
                   type="text"
                   required
@@ -65,7 +101,7 @@ export const ContactPage: React.FC = () => {
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-[#171717]">Your Email</label>
+                <label className="text-xs font-medium text-[#171717]">Your Email *</label>
                 <input
                   type="email"
                   required
@@ -78,19 +114,19 @@ export const ContactPage: React.FC = () => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-[#171717]">Subject</label>
+              <label className="text-xs font-medium text-[#171717]">Subject *</label>
               <input
                 type="text"
                 required
                 value={formData.subject}
                 onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                placeholder="Styling Curation / Business Inquiry"
+                placeholder="Styling Curation / Affiliate Inquiry / Suggestion"
                 className="w-full bg-[#F7F3EB] border border-[#E5DDD0] focus:border-[#CDA66B] rounded-xl px-3.5 py-2.5 text-xs text-[#171717] placeholder-[#66615B] outline-none"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-[#171717]">Message</label>
+              <label className="text-xs font-medium text-[#171717]">Message *</label>
               <textarea
                 required
                 rows={4}
