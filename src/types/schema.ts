@@ -26,6 +26,8 @@ export interface Product {
   outfitId: string; // References Outfit document ID or business identifier
   name: string;
   retailer: string;
+  category?: string; // Optional clothing category (e.g., 'Shirt', 'Pants', 'Shoes', 'Accessory')
+  retailerLogoUrl?: string | null; // Optional direct retailer logo URL
   price?: number | null;
   currency: string; // "INR" default
   affiliateUrl: string;

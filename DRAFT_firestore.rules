@@ -58,10 +58,12 @@ service cloud.firestore {
     // Validation helper for Product
     function isValidProduct(data) {
       return data.keys().hasAll(['outfitId', 'name', 'retailer', 'currency', 'affiliateUrl', 'sortOrder', 'createdAt', 'updatedAt'])
-        && data.keys().hasOnly(['outfitId', 'name', 'retailer', 'price', 'currency', 'affiliateUrl', 'imageUrl', 'sortOrder', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['outfitId', 'name', 'retailer', 'category', 'retailerLogoUrl', 'price', 'currency', 'affiliateUrl', 'imageUrl', 'sortOrder', 'createdAt', 'updatedAt'])
         && data.outfitId is string && data.outfitId.size() >= 4 && data.outfitId.size() <= 64
         && data.name is string && data.name.size() >= 2 && data.name.size() <= 150
         && data.retailer is string && data.retailer.size() >= 2 && data.retailer.size() <= 80
+        && (data.category == null || (data.category is string && data.category.size() <= 50))
+        && (data.retailerLogoUrl == null || (data.retailerLogoUrl is string && data.retailerLogoUrl.size() <= 1000))
         && (data.price == null || data.price is number)
         && data.currency is string && data.currency.size() == 3
         && data.affiliateUrl is string && data.affiliateUrl.size() <= 1000
@@ -119,17 +121,11 @@ service cloud.firestore {
     // Collection: products
     // ----------------------------------------------------
     match /products/{productId} {
-      // Public visitors can view individual product if its outfit is published
-      allow get: if isValidId(productId) && (
-        isAdmin() ||
-        (
-          resource.data.outfitId is string &&
-          get(/databases/$(database)/documents/outfits/$(resource.data.outfitId)).data.status == 'published'
-        )
-      );
+      // Public visitors can view individual product documents
+      allow get: if isValidId(productId);
 
-      // Query / list products (no expensive get() in list rule)
-      allow list: if isAdmin() || (resource.data.outfitId is string);
+      // Query / list products for public display (writes strictly restricted to admin)
+      allow list: if true;
 
       // Create: Admin only, parent outfit must exist
       allow create: if isValidId(productId)

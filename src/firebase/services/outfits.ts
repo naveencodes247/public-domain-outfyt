@@ -43,7 +43,10 @@ export async function getPublishedOutfits(): Promise<Outfit[]> {
       where('status', '==', 'published')
     );
     const snapshot = await getDocs(q);
-    const results = snapshot.docs.map((d) => ({ ...d.data() } as Outfit));
+    const results = snapshot.docs.map((d) => {
+      const data = d.data();
+      return { id: data.id || d.id, ...data } as Outfit;
+    });
     return results.sort((a, b) => {
       const timeA = parseTimestampMs(a.publishedAt || a.createdAt);
       const timeB = parseTimestampMs(b.publishedAt || b.createdAt);
@@ -69,7 +72,10 @@ export function subscribeToPublishedOutfits(
   return onSnapshot(
     q,
     (snapshot) => {
-      const results = snapshot.docs.map((d) => ({ ...d.data() } as Outfit));
+      const results = snapshot.docs.map((d) => {
+        const data = d.data();
+        return { id: data.id || d.id, ...data } as Outfit;
+      });
       results.sort((a, b) => {
         const timeA = parseTimestampMs(a.publishedAt || a.createdAt);
         const timeB = parseTimestampMs(b.publishedAt || b.createdAt);
@@ -89,7 +95,10 @@ export function subscribeToPublishedOutfits(
 export async function getAllOutfitsAdmin(): Promise<Outfit[]> {
   try {
     const snapshot = await getDocs(collection(db, COLLECTION_NAME));
-    const results = snapshot.docs.map((d) => ({ ...d.data() } as Outfit));
+    const results = snapshot.docs.map((d) => {
+      const data = d.data();
+      return { id: data.id || d.id, ...data } as Outfit;
+    });
     return results.sort((a, b) => {
       const timeA = parseTimestampMs(a.updatedAt || a.createdAt);
       const timeB = parseTimestampMs(b.updatedAt || b.createdAt);
@@ -104,14 +113,37 @@ export async function getAllOutfitsAdmin(): Promise<Outfit[]> {
  * Fetches an outfit by its business ID (e.g., 'OUT-001').
  */
 export async function getOutfitById(outfitId: string): Promise<Outfit | null> {
-  const path = `${COLLECTION_NAME}/${outfitId}`;
+  const cleanId = (outfitId || '').trim();
+  if (!cleanId) return null;
+  const path = `${COLLECTION_NAME}/${cleanId}`;
   try {
-    const docRef = doc(db, COLLECTION_NAME, outfitId);
-    const snapshot = await getDoc(docRef);
+    const docRef = doc(db, COLLECTION_NAME, cleanId);
+    let snapshot = await getDoc(docRef);
+    if (!snapshot.exists() && cleanId !== cleanId.toUpperCase()) {
+      const upperRef = doc(db, COLLECTION_NAME, cleanId.toUpperCase());
+      snapshot = await getDoc(upperRef);
+    }
     if (!snapshot.exists()) {
+      const q = query(
+        collection(db, COLLECTION_NAME),
+        where('id', '==', cleanId)
+      );
+      const querySnap = await getDocs(q);
+      if (!querySnap.empty) {
+        const d = querySnap.docs[0];
+        const data = d.data();
+        return {
+          id: data.id || d.id,
+          ...data,
+        } as Outfit;
+      }
       return null;
     }
-    return snapshot.data() as Outfit;
+    const data = snapshot.data();
+    return {
+      id: data?.id || snapshot.id,
+      ...data,
+    } as Outfit;
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, path);
   }
@@ -122,19 +154,49 @@ export async function getOutfitById(outfitId: string): Promise<Outfit | null> {
  */
 export async function getOutfitBySlug(slug: string): Promise<Outfit | null> {
   try {
+    const cleanSlug = (slug || '').trim().toLowerCase();
+    if (!cleanSlug) return null;
+
     const q = query(
       collection(db, COLLECTION_NAME),
-      where('slug', '==', slug),
+      where('slug', '==', cleanSlug),
       where('status', '==', 'published')
     );
     const snapshot = await getDocs(q);
     if (!snapshot.empty) {
-      return snapshot.docs[0].data() as Outfit;
+      const d = snapshot.docs[0];
+      const data = d.data();
+      return {
+        id: data.id || d.id,
+        ...data,
+      } as Outfit;
     }
-    // Fallback: check if slug matches business id
+
+    if (cleanSlug !== slug.trim()) {
+      const qOrig = query(
+        collection(db, COLLECTION_NAME),
+        where('slug', '==', slug.trim()),
+        where('status', '==', 'published')
+      );
+      const snapOrig = await getDocs(qOrig);
+      if (!snapOrig.empty) {
+        const d = snapOrig.docs[0];
+        const data = d.data();
+        return {
+          id: data.id || d.id,
+          ...data,
+        } as Outfit;
+      }
+    }
+
+    // Fallback: check if slug matches business id (e.g. 'OUT-001')
     const byId = await getOutfitById(slug.toUpperCase());
     if (byId && byId.status === 'published') {
       return byId;
+    }
+    const byIdDirect = await getOutfitById(slug);
+    if (byIdDirect && byIdDirect.status === 'published') {
+      return byIdDirect;
     }
     return null;
   } catch (error) {

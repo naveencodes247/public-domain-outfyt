@@ -19,16 +19,51 @@ const COLLECTION_NAME = 'products';
 
 /**
  * Fetches all products associated with a specific outfit.
+ * Supports primary outfit ID (e.g., 'OUT-001') and optional fallback identifier (e.g. slug 'collegefit')
+ * to ensure products resolve reliably even if references vary.
  */
-export async function getProductsByOutfitId(outfitId: string): Promise<Product[]> {
+export async function getProductsByOutfitId(
+  outfitId?: string | null,
+  fallbackId?: string | null
+): Promise<Product[]> {
   try {
-    const q = query(
-      collection(db, COLLECTION_NAME),
-      where('outfitId', '==', outfitId)
-    );
-    const snapshot = await getDocs(q);
-    const products = snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Product));
-    return products.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+    const candidates: string[] = [];
+    if (outfitId && typeof outfitId === 'string' && outfitId.trim()) {
+      const clean = outfitId.trim();
+      candidates.push(clean);
+      if (clean.toUpperCase() !== clean) candidates.push(clean.toUpperCase());
+      if (clean.toLowerCase() !== clean) candidates.push(clean.toLowerCase());
+    }
+
+    if (fallbackId && typeof fallbackId === 'string' && fallbackId.trim()) {
+      const cleanFb = fallbackId.trim();
+      if (!candidates.includes(cleanFb)) candidates.push(cleanFb);
+      if (cleanFb.toUpperCase() !== cleanFb && !candidates.includes(cleanFb.toUpperCase())) {
+        candidates.push(cleanFb.toUpperCase());
+      }
+      if (cleanFb.toLowerCase() !== cleanFb && !candidates.includes(cleanFb.toLowerCase())) {
+        candidates.push(cleanFb.toLowerCase());
+      }
+    }
+
+    if (candidates.length === 0) {
+      return [];
+    }
+
+    // Try candidate identifiers until matching products are found
+    for (const id of candidates) {
+      const q = query(
+        collection(db, COLLECTION_NAME),
+        where('outfitId', '==', id)
+      );
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        const products = snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Product));
+        return products.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+      }
+    }
+
+    return [];
   } catch (error) {
     handleFirestoreError(error, OperationType.LIST, COLLECTION_NAME);
   }
@@ -57,6 +92,16 @@ export async function createProduct(
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
+
+    // Optional clothing category (e.g., Shirt, Pants, Footwear, Accessories)
+    if (product.category && typeof product.category === 'string' && product.category.trim()) {
+      rawPayload.category = product.category.trim();
+    }
+
+    // Optional direct retailer logo URL
+    if (product.retailerLogoUrl && typeof product.retailerLogoUrl === 'string' && product.retailerLogoUrl.trim()) {
+      rawPayload.retailerLogoUrl = product.retailerLogoUrl.trim();
+    }
 
     // Only set price if it is a valid finite number
     if (typeof product.price === 'number' && !isNaN(product.price)) {

@@ -25,6 +25,8 @@ interface ProductItemState {
   id?: string;
   name: string;
   retailer: string;
+  category?: string;
+  retailerLogoUrl?: string;
   isCustomRetailer?: boolean;
   price: string;
   currency: string;
@@ -32,6 +34,24 @@ interface ProductItemState {
   imageUrl: string;
   sortOrder: number;
 }
+
+const PRODUCT_CATEGORIES = [
+  'Shirt',
+  'T-Shirt',
+  'Pants / Trousers',
+  'Jeans',
+  'Footwear / Shoes',
+  'Sneakers',
+  'Jacket / Blazer',
+  'Kurta',
+  'Dress',
+  'Accessory',
+  'Watch',
+  'Bag',
+  'Sunglasses',
+  'Jewelry',
+  'Other',
+];
 
 const INDIAN_RETAILERS = [
   'Amazon India',
@@ -82,6 +102,8 @@ export const AdminOutfitEditorPage: React.FC = () => {
     {
       name: '',
       retailer: 'Amazon India',
+      category: 'Shirt',
+      retailerLogoUrl: '',
       isCustomRetailer: false,
       price: '',
       currency: 'INR',
@@ -123,6 +145,8 @@ export const AdminOutfitEditorPage: React.FC = () => {
                   id: p.id,
                   name: p.name,
                   retailer: p.retailer,
+                  category: p.category || '',
+                  retailerLogoUrl: p.retailerLogoUrl || '',
                   isCustomRetailer: !isKnown,
                   price: p.price ? String(p.price) : '',
                   currency: p.currency || 'INR',
@@ -165,6 +189,8 @@ export const AdminOutfitEditorPage: React.FC = () => {
       {
         name: '',
         retailer: 'Amazon India',
+        category: 'Shirt',
+        retailerLogoUrl: '',
         isCustomRetailer: false,
         price: '',
         currency: 'INR',
@@ -276,6 +302,8 @@ export const AdminOutfitEditorPage: React.FC = () => {
     const parsedProducts: Array<{
       name: string;
       retailer: string;
+      category?: string;
+      retailerLogoUrl?: string;
       price?: number;
       currency: string;
       affiliateUrl: string;
@@ -310,6 +338,8 @@ export const AdminOutfitEditorPage: React.FC = () => {
       parsedProducts.push({
         name: p.name.trim(),
         retailer: p.retailer.trim(),
+        category: p.category?.trim() || undefined,
+        retailerLogoUrl: p.retailerLogoUrl?.trim() || undefined,
         price: parsedPrice,
         currency: p.currency || 'INR',
         affiliateUrl: p.affiliateUrl.trim(),
@@ -368,6 +398,8 @@ export const AdminOutfitEditorPage: React.FC = () => {
           outfitId: trimmedId,
           name: p.name,
           retailer: p.retailer,
+          category: p.category,
+          retailerLogoUrl: p.retailerLogoUrl,
           price: p.price,
           currency: p.currency,
           affiliateUrl: p.affiliateUrl,
@@ -748,8 +780,8 @@ export const AdminOutfitEditorPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="sm:col-span-2 space-y-1">
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                <div className="sm:col-span-6 space-y-1">
                   <label className="text-[11px] font-medium text-[#171717]">Product Name *</label>
                   <input
                     type="text"
@@ -761,8 +793,25 @@ export const AdminOutfitEditorPage: React.FC = () => {
                   />
                 </div>
 
+                {/* Clothing Category Selector */}
+                <div className="sm:col-span-3 space-y-1">
+                  <label className="text-[11px] font-medium text-[#171717]">Clothing Category</label>
+                  <select
+                    value={item.category || ''}
+                    onChange={(e) => handleProductChange(index, 'category', e.target.value)}
+                    className="w-full bg-[#FFFFFF] border border-[#E5DDD0] rounded-lg px-3 py-2 text-xs text-[#171717] outline-none focus:border-[#CDA66B]"
+                  >
+                    <option value="">Select category...</option>
+                    {PRODUCT_CATEGORIES.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 {/* Retailer Selector for Indian Market */}
-                <div className="space-y-1">
+                <div className="sm:col-span-3 space-y-1">
                   <label className="text-[11px] font-medium text-[#171717]">Retailer Partner *</label>
                   {!item.isCustomRetailer ? (
                     <select
@@ -798,8 +847,8 @@ export const AdminOutfitEditorPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="space-y-1">
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                <div className="sm:col-span-4 space-y-1">
                   <label className="text-[11px] font-medium text-[#171717]">Price (optional)</label>
                   <div className="flex gap-1">
                     <select
@@ -822,7 +871,7 @@ export const AdminOutfitEditorPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="sm:col-span-2 space-y-1">
+                <div className="sm:col-span-8 space-y-1">
                   <label className="text-[11px] font-medium text-[#171717]">Affiliate Destination URL *</label>
                   <input
                     type="url"
@@ -835,15 +884,28 @@ export const AdminOutfitEditorPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-[11px] font-medium text-[#171717]">Product Image URL (optional)</label>
-                <input
-                  type="url"
-                  value={item.imageUrl}
-                  onChange={(e) => handleProductChange(index, 'imageUrl', e.target.value)}
-                  placeholder="https://... (thumbnail preview)"
-                  className="w-full bg-[#FFFFFF] border border-[#E5DDD0] rounded-lg px-3 py-2 text-xs text-[#171717] outline-none focus:border-[#CDA66B]"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-[#171717]">Product Image URL (optional)</label>
+                  <input
+                    type="url"
+                    value={item.imageUrl}
+                    onChange={(e) => handleProductChange(index, 'imageUrl', e.target.value)}
+                    placeholder="https://... (thumbnail preview)"
+                    className="w-full bg-[#FFFFFF] border border-[#E5DDD0] rounded-lg px-3 py-2 text-xs text-[#171717] outline-none focus:border-[#CDA66B]"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-[#171717]">Retailer Logo URL (optional)</label>
+                  <input
+                    type="url"
+                    value={item.retailerLogoUrl || ''}
+                    onChange={(e) => handleProductChange(index, 'retailerLogoUrl', e.target.value)}
+                    placeholder="https://... (custom retailer mark)"
+                    className="w-full bg-[#FFFFFF] border border-[#E5DDD0] rounded-lg px-3 py-2 text-xs text-[#171717] outline-none focus:border-[#CDA66B]"
+                  />
+                </div>
               </div>
             </div>
           ))}

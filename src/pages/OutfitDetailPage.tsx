@@ -39,7 +39,7 @@ export const OutfitDetailPage: React.FC = () => {
         if (isMounted) {
           setOutfit(current);
           if (current) {
-            const items = await getProductsByOutfitId(current.id);
+            const items = await getProductsByOutfitId(current.id, current.slug || slug);
             if (isMounted) setProducts(items);
 
             const allPublished = await getPublishedOutfits();

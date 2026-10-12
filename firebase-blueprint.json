@@ -101,6 +101,16 @@
           "description": "Retailer partner name (e.g., Myntra, Zara, H&M, Amazon)",
           "maxLength": 80
         },
+        "category": {
+          "type": "string",
+          "description": "Optional clothing category (e.g., Shirt, Pants, Shoes, Accessory)",
+          "maxLength": 50
+        },
+        "retailerLogoUrl": {
+          "type": "string",
+          "description": "Optional direct retailer logo image URL",
+          "maxLength": 1000
+        },
         "price": {
           "type": "number",
           "description": "Approximate or retail price value"
