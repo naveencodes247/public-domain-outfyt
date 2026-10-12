@@ -18,6 +18,7 @@ export const OutfitDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
+  const [mediaError, setMediaError] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -110,8 +111,10 @@ export const OutfitDetailPage: React.FC = () => {
   }
 
   const isVideo = outfit.heroMediaType === 'video';
-  const mediaUrl = outfit.heroMediaUrl || outfit.heroImageUrl;
-  const posterUrl = outfit.heroThumbnailUrl || outfit.heroImageUrl;
+  const rawMedia = outfit.heroMediaUrl || outfit.heroImageUrl || '';
+  const mediaUrl = rawMedia && !rawMedia.startsWith('blob:') ? rawMedia : '';
+  const rawPoster = outfit.heroThumbnailUrl || outfit.heroImageUrl || '';
+  const posterUrl = rawPoster && !rawPoster.startsWith('blob:') ? rawPoster : '';
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-10 sm:space-y-12">
@@ -153,13 +156,13 @@ export const OutfitDetailPage: React.FC = () => {
         </button>
       </div>
 
-      {/* Main Outfit Layout (2 Columns) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-start">
-        {/* Left Column: Hero Media (Image or Video) */}
-        <div className="lg:col-span-6 sticky top-24">
-          <div className="rounded-2xl overflow-hidden bg-[#FFFFFF] border border-[#E5DDD0] shadow-md relative">
-            <div className="aspect-[3/4] relative bg-[#EFE6D8] overflow-hidden">
-              {isVideo ? (
+      {/* Main Outfit Layout (2 Columns on Desktop, Single Column Natural Flow on Mobile) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+        {/* Left Column: Hero Media (Image or Video) - Sticky ONLY on desktop (lg:), natural flow on mobile */}
+        <div className="lg:col-span-6 lg:sticky lg:top-24 lg:self-start w-full">
+          <div className="rounded-2xl overflow-hidden bg-[#FFFFFF] border border-[#E5DDD0] shadow-sm relative">
+            <div className="aspect-[3/4] max-h-[62vh] sm:max-h-[78vh] w-full relative bg-[#EFE6D8] overflow-hidden flex items-center justify-center">
+              {isVideo && mediaUrl && !mediaError ? (
                 <div className="w-full h-full relative">
                   <video
                     src={mediaUrl}
@@ -167,30 +170,49 @@ export const OutfitDetailPage: React.FC = () => {
                     controls
                     playsInline
                     muted={isMuted}
-                    preload="auto"
+                    preload="metadata"
+                    onError={() => setMediaError(true)}
                     className="w-full h-full object-cover"
                   />
                   {/* Floating Mute/Unmute Toggle Shortcut */}
                   <button
                     onClick={() => setIsMuted(!isMuted)}
-                    className="absolute top-4 right-4 z-20 bg-[#171717]/80 backdrop-blur-xs text-white p-2 rounded-full border border-white/20 hover:bg-[#171717] transition"
+                    className="absolute top-4 right-4 z-20 bg-[#171717]/80 backdrop-blur-xs text-white p-2 rounded-full border border-white/20 hover:bg-[#171717] transition cursor-pointer"
                     title={isMuted ? 'Unmute video audio' : 'Mute video audio'}
+                    aria-label={isMuted ? 'Unmute video' : 'Mute video'}
                   >
                     {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4 text-[#CDA66B]" />}
                   </button>
                 </div>
-              ) : (
+              ) : mediaUrl && !mediaError ? (
                 <img
                   src={mediaUrl}
                   alt={outfit.heroMediaAlt || outfit.title}
+                  onError={() => setMediaError(true)}
                   className="w-full h-full object-cover object-top"
                 />
+              ) : (
+                /* Editorial Aesthetic Fallback when media fails to load or is unconfigured */
+                <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center text-[#66615B] bg-[#EFE6D8]">
+                  <div className="w-14 h-14 rounded-2xl bg-[#FFFFFF] border border-[#E5DDD0] flex items-center justify-center mb-3 shadow-xs">
+                    <ShoppingBag className="w-7 h-7 text-[#CDA66B]" />
+                  </div>
+                  <span className="font-mono text-xs uppercase tracking-widest text-[#A77B3D] font-bold">
+                    {outfit.id}
+                  </span>
+                  <h3 className="font-editorial text-lg font-bold text-[#171717] mt-1 line-clamp-2">
+                    {outfit.title}
+                  </h3>
+                  <span className="text-[11px] text-[#66615B] mt-1">
+                    {isVideo ? 'Video reel loading' : 'Look presentation'}
+                  </span>
+                </div>
               )}
             </div>
 
             {/* Corner Look ID Badge */}
-            <div className="absolute top-4 left-4 z-10">
-              <span className="bg-[#171717]/90 backdrop-blur-xs text-[#CDA66B] border border-[#CDA66B]/40 font-mono text-sm font-bold px-3 py-1 rounded shadow-md">
+            <div className="absolute top-3 left-3 z-10 pointer-events-none">
+              <span className="bg-[#171717]/90 backdrop-blur-xs text-[#CDA66B] border border-[#CDA66B]/40 font-mono text-xs font-bold px-3 py-1 rounded shadow-md">
                 {outfit.id}
               </span>
             </div>

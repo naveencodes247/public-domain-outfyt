@@ -13,11 +13,12 @@ export const OutfitCard: React.FC<OutfitCardProps> = ({ outfit, priority = false
   const targetUrl = `/outfit/${outfit.slug || outfit.id.toLowerCase()}`;
 
   const isVideo = outfit.heroMediaType === 'video';
-  // Thumbnail prioritized for both video and image to ensure fast grid loads
-  const displayImageUrl =
+  // Thumbnail prioritized for both video and image to ensure fast grid loads; filter out dead blob: URLs
+  const rawImageUrl =
     outfit.heroThumbnailUrl ||
     outfit.heroImageUrl ||
     (!isVideo ? outfit.heroMediaUrl : '');
+  const displayImageUrl = rawImageUrl && !rawImageUrl.startsWith('blob:') ? rawImageUrl : '';
 
   return (
     <Link
