@@ -1,0 +1,32 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Global helper: checks if the requester is an authorized OutFyt administrator
+    function isAdmin() {
+      return request.auth != null && (
+        (request.auth.token.email == 'naveencodes247@gmail.com' || request.auth.token.email == 'outfyt.co.in@gmail.com') &&
+        request.auth.token.email_verified == true
+      );
+    }
+
+    // Public read access for outfit imagery and video reels
+    // Write/delete operations restricted strictly to authorized administrators
+    match /outfits/{outfitId}/{fileName} {
+      allow read: if true;
+      allow write: if isAdmin()
+        && request.resource.size < 50 * 1024 * 1024 // 50MB maximum
+        && (
+          request.resource.contentType.matches('image/.*') ||
+          request.resource.contentType.matches('video/.*')
+        );
+      allow delete: if isAdmin();
+    }
+
+    // Default deny for all other paths
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

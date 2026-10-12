@@ -12,6 +12,10 @@ import {
   HelpCircle,
   ChevronUp,
   ChevronDown,
+  Upload,
+  Loader2,
+  X,
+  RefreshCw,
 } from 'lucide-react';
 import { getOutfitById, createOutfit, updateOutfit } from '../../firebase/services/outfits';
 import {
@@ -19,6 +23,7 @@ import {
   createProduct,
   deleteProductsByOutfitId,
 } from '../../firebase/services/products';
+import { uploadOutfitMedia, validateMediaFile } from '../../firebase/services/storage';
 import { MediaType } from '../../types/schema';
 
 interface ProductItemState {
@@ -96,6 +101,11 @@ export const AdminOutfitEditorPage: React.FC = () => {
   const [heroMediaUrl, setHeroMediaUrl] = useState('');
   const [heroThumbnailUrl, setHeroThumbnailUrl] = useState('');
   const [heroMediaAlt, setHeroMediaAlt] = useState('');
+
+  // Media Upload State
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [uploadStatusMsg, setUploadStatusMsg] = useState<string | null>(null);
 
   // Product Items
   const [products, setProducts] = useState<ProductItemState[]>([
@@ -245,19 +255,85 @@ export const AdminOutfitEditorPage: React.FC = () => {
     }
   };
 
-  // Local file selection preview helper
-  const handleFilePreview = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Device file upload handler (Image or Video)
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const isVideoFile = file.type.startsWith('video/');
-      const previewUrl = URL.createObjectURL(file);
-      setHeroMediaUrl(previewUrl);
-      if (isVideoFile) {
-        setHeroMediaType('video');
-      } else {
-        setHeroMediaType('image');
-      }
+    if (!file) return;
+
+    setErrorMsg(null);
+    setUploadStatusMsg(null);
+
+    const validation = validateMediaFile(file, heroMediaType);
+    if (!validation.valid) {
+      setErrorMsg(validation.error || 'Invalid file format');
+      return;
     }
+
+    // Set immediate preview
+    const localPreview = URL.createObjectURL(file);
+    setHeroMediaUrl(localPreview);
+    setHeroMediaType(validation.detectedType);
+
+    setIsUploading(true);
+    setUploadProgress(0);
+    setUploadStatusMsg(`Uploading ${file.name} to persistent storage...`);
+
+    try {
+      const result = await uploadOutfitMedia(file, outfitId || 'temp', {
+        expectedType: validation.detectedType,
+        onProgress: (pct) => setUploadProgress(pct),
+      });
+      setHeroMediaUrl(result.downloadUrl);
+      setHeroMediaType(result.mediaType);
+      setUploadStatusMsg('Uploaded successfully! Media is saved to persistent storage.');
+      setSuccessMsg('Media uploaded successfully to Firebase Storage.');
+    } catch (uploadErr: any) {
+      setErrorMsg(uploadErr.message || 'Media upload failed.');
+      setUploadStatusMsg(null);
+      // Revoke broken preview
+      setHeroMediaUrl('');
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(null);
+      e.target.value = '';
+    }
+  };
+
+  // Video poster upload handler
+  const handlePosterSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setErrorMsg(null);
+    const validation = validateMediaFile(file, 'image');
+    if (!validation.valid) {
+      setErrorMsg(validation.error || 'Invalid poster image');
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadProgress(0);
+    setUploadStatusMsg(`Uploading poster ${file.name}...`);
+
+    try {
+      const result = await uploadOutfitMedia(file, `${outfitId || 'temp'}-poster`, {
+        expectedType: 'image',
+        onProgress: (pct) => setUploadProgress(pct),
+      });
+      setHeroThumbnailUrl(result.downloadUrl);
+      setUploadStatusMsg('Poster image uploaded successfully to persistent storage.');
+    } catch (err: any) {
+      setErrorMsg(`Poster upload failed: ${err.message}`);
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(null);
+      e.target.value = '';
+    }
+  };
+
+  const handleRemoveMedia = () => {
+    setHeroMediaUrl('');
+    setUploadStatusMsg(null);
   };
 
   const handleSave = async (targetStatus?: 'draft' | 'published') => {
@@ -294,8 +370,13 @@ export const AdminOutfitEditorPage: React.FC = () => {
       return;
     }
 
+    if (heroMediaUrl.startsWith('blob:')) {
+      setErrorMsg('Media upload is still in progress. Please wait for upload to complete before saving.');
+      return;
+    }
+
     if (!heroMediaUrl.trim()) {
-      setErrorMsg('Please provide a Hero Image or Video URL.');
+      setErrorMsg('Please upload an image or video, or provide a valid Hero Media URL.');
       return;
     }
 
@@ -627,11 +708,73 @@ export const AdminOutfitEditorPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Primary Media URL */}
+          {/* Device File Upload with Progress */}
+          <div className="space-y-2 p-4 bg-[#F7F3EB]/70 border border-[#E5DDD0] rounded-xl">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-[#171717] flex items-center gap-1.5">
+                <Upload className="w-3.5 h-3.5 text-[#CDA66B]" />
+                <span>Upload {heroMediaType === 'video' ? 'Video File' : 'Image File'}</span>
+              </label>
+              <span className="text-[10px] text-[#66615B]">
+                {heroMediaType === 'video' ? 'MP4, WebM, MOV (Max 50MB)' : 'JPG, PNG, WebP (Max 10MB)'}
+              </span>
+            </div>
+
+            <div className="relative">
+              <input
+                type="file"
+                disabled={isUploading}
+                accept={heroMediaType === 'video' ? 'video/mp4,video/webm,video/quicktime' : 'image/jpeg,image/png,image/webp'}
+                onChange={handleFileSelect}
+                className="w-full text-xs text-[#66615B] file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-[#CDA66B] file:text-[#FFFFFF] hover:file:bg-[#A77B3D] file:cursor-pointer disabled:opacity-50"
+              />
+            </div>
+
+            {/* Upload Progress Bar */}
+            {isUploading && uploadProgress !== null && (
+              <div className="space-y-1.5 pt-2">
+                <div className="flex items-center justify-between text-xs text-[#171717]">
+                  <span className="flex items-center gap-1 text-[11px] font-medium text-[#A77B3D]">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <span>Uploading to Firebase Storage...</span>
+                  </span>
+                  <span className="font-mono text-xs font-bold text-[#CDA66B]">{uploadProgress}%</span>
+                </div>
+                <div className="w-full bg-[#E5DDD0] h-2 rounded-full overflow-hidden">
+                  <div
+                    className="bg-[#CDA66B] h-full transition-all duration-200 rounded-full"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Upload Status / Success Feedback */}
+            {uploadStatusMsg && !isUploading && (
+              <div className="text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg p-2 flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span className="truncate">{uploadStatusMsg}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Primary Media URL (Auto-filled on upload or manual input) */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-[#171717]">
-              {heroMediaType === 'video' ? 'Video File URL (MP4 / WebM) *' : 'Image URL *'}
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-[#171717]">
+                {heroMediaType === 'video' ? 'Video File URL (Persistent / CDN) *' : 'Image URL (Persistent / CDN) *'}
+              </label>
+              {heroMediaUrl && (
+                <button
+                  type="button"
+                  onClick={handleRemoveMedia}
+                  className="text-[10px] text-red-600 hover:text-red-700 flex items-center gap-0.5 cursor-pointer"
+                >
+                  <X className="w-3 h-3" />
+                  <span>Clear Media</span>
+                </button>
+              )}
+            </div>
             <input
               type="url"
               required
@@ -640,46 +783,48 @@ export const AdminOutfitEditorPage: React.FC = () => {
               placeholder={heroMediaType === 'video' ? 'https://example.com/reel.mp4' : 'https://example.com/look.jpg'}
               className="w-full bg-[#F7F3EB] border border-[#E5DDD0] rounded-xl px-3.5 py-2.5 text-xs text-[#171717] outline-none focus:border-[#CDA66B]"
             />
-          </div>
-
-          {/* Optional Local File Selection Preview */}
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-medium text-[#66615B] flex items-center gap-1">
-              <span>Local File Preview Selection (Optional)</span>
-            </label>
-            <input
-              type="file"
-              accept={heroMediaType === 'video' ? 'video/mp4,video/webm' : 'image/jpeg,image/png,image/webp'}
-              onChange={handleFilePreview}
-              className="w-full text-xs text-[#66615B] file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#EFE6D8] file:text-[#171717] hover:file:bg-[#E5DDD0]"
-            />
-            <span className="text-[10px] text-[#66615B] block italic">
-              Note: Preview uses local object mapping; URLs persist into Cloud Firestore.
+            <span className="text-[10px] text-[#66615B] block">
+              Auto-populated when uploading a file from your device, or paste a high-resolution CDN link.
             </span>
           </div>
 
-          {/* Poster URL for Video */}
+          {/* Video Poster Thumbnail Option */}
           {heroMediaType === 'video' && (
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-[#171717]">
-                Video Poster / Thumbnail Image URL
-              </label>
+            <div className="space-y-2 p-3 bg-[#F7F3EB]/50 border border-[#E5DDD0] rounded-xl">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-[#171717]">
+                  Video Poster / Thumbnail Image
+                </label>
+                <span className="text-[10px] text-[#66615B]">Shown in gallery grid</span>
+              </div>
+              <input
+                type="file"
+                disabled={isUploading}
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handlePosterSelect}
+                className="w-full text-xs text-[#66615B] file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[11px] file:font-semibold file:bg-[#EFE6D8] file:text-[#171717] hover:file:bg-[#E5DDD0] file:cursor-pointer disabled:opacity-50"
+              />
               <input
                 type="url"
                 value={heroThumbnailUrl}
                 onChange={(e) => setHeroThumbnailUrl(e.target.value)}
-                placeholder="https://example.com/poster.jpg"
-                className="w-full bg-[#F7F3EB] border border-[#E5DDD0] rounded-xl px-3.5 py-2.5 text-xs text-[#171717] outline-none focus:border-[#CDA66B]"
+                placeholder="https://example.com/poster.jpg (or upload above)"
+                className="w-full bg-[#FFFFFF] border border-[#E5DDD0] rounded-xl px-3 py-2 text-xs text-[#171717] outline-none focus:border-[#CDA66B]"
               />
-              <span className="text-[10px] text-[#66615B]">
-                Shown in gallery cards to ensure light page weight.
-              </span>
             </div>
           )}
 
           {/* Interactive Media Preview Box */}
           <div className="space-y-1.5 pt-1">
-            <label className="text-xs font-medium text-[#66615B]">Interactive Media Preview</label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-[#66615B]">Interactive Media Preview</label>
+              {heroMediaUrl && (
+                <span className="text-[10px] text-emerald-700 font-medium flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                  Media Active
+                </span>
+              )}
+            </div>
             <div className="aspect-[3/4] rounded-xl overflow-hidden bg-[#F7F3EB] border border-[#E5DDD0] flex items-center justify-center relative">
               {heroMediaUrl ? (
                 heroMediaType === 'video' ? (
@@ -702,7 +847,8 @@ export const AdminOutfitEditorPage: React.FC = () => {
               ) : (
                 <div className="text-center text-[#66615B] p-6 space-y-1">
                   <ImageIcon className="w-8 h-8 mx-auto text-[#66615B]" />
-                  <span className="text-xs block">Provide media URL or pick file to preview</span>
+                  <span className="text-xs block font-medium">No media selected</span>
+                  <span className="text-[11px] text-[#A77B3D] block">Upload a file or paste a media URL above</span>
                 </div>
               )}
               {outfitId && (
