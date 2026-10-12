@@ -117,7 +117,7 @@ export const Footer: React.FC = () => {
 
             <div className="p-3.5 rounded-xl bg-[#FFFFFF] border border-[#E5DDD0] text-xs text-[#66615B] leading-relaxed shadow-xs">
               <span className="font-semibold text-[#171717] block mb-1">
-                Transparency Notice:
+                Affiliate Notice:
               </span>
               OutFyt.co.in is an independent curation platform. When you purchase through retailer links on our site, we may earn an affiliate commission at no extra cost to you.
             </div>
@@ -137,6 +137,8 @@ export const Footer: React.FC = () => {
             <Link to="/terms" className="hover:text-[#171717] transition-colors">Terms</Link>
             <span>&bull;</span>
             <Link to="/contact" className="hover:text-[#171717] transition-colors">Support</Link>
+            <span>&bull;</span>
+            <Link to="/admin" className="hover:text-[#171717] transition-colors">Admin Portal</Link>
           </div>
         </div>
       </div>

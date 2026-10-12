@@ -89,7 +89,7 @@ async function runTests() {
     failures++;
   }
 
-  // Test 7: Test E - Verify Footer contains discreet Admin Portal link and Header does not
+  // Test 7: Test E - Verify Footer and Header navigation links for Admin route
   console.log('Test 7: Test E - Check Footer and Header navigation');
   const footerContent = fs.readFileSync(path.join(process.cwd(), 'src/components/layout/Footer.tsx'), 'utf-8');
   const headerContent = fs.readFileSync(path.join(process.cwd(), 'src/components/layout/Header.tsx'), 'utf-8');
@@ -101,10 +101,11 @@ async function runTests() {
     failures++;
   }
 
-  if (!headerContent.includes('to="/admin"') && !headerContent.includes('Admin Portal') && !headerContent.includes('Admin Panel')) {
-    console.log('  [PASS] Header does not contain public Admin links');
+  // Pre-launch improvement #12 specifically requires a compact Admin navigation link in Header
+  if (headerContent.includes('to="/admin"') && headerContent.includes('Admin')) {
+    console.log('  [PASS] Header contains compact Admin navigation link as requested in pre-launch improvement #12');
   } else {
-    console.error('  [FAIL] Header contains unexpected Admin link');
+    console.error('  [FAIL] Header missing compact Admin link');
     failures++;
   }
 
