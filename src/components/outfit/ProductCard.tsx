@@ -3,6 +3,7 @@ import { ExternalLink, Tag, ShoppingBag, AlertCircle } from 'lucide-react';
 import { Product } from '../../types/schema';
 import { recordAffiliateClick } from '../../firebase/services/analytics';
 import { RetailerLogo } from '../../utils/retailerLogos';
+import { getCategoryIcon } from '../../utils/categoryIcons';
 
 interface ProductCardProps {
   product: Product;
@@ -79,8 +80,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, outfitId }) =
             />
           ) : (
             <div className="w-full h-full flex flex-col items-center justify-center text-[#66615B] bg-[#F7F3EB] p-2 text-center">
-              <ShoppingBag className="w-6 h-6 mb-1 text-[#A77B3D]" />
-              <span className="text-[10px] uppercase font-mono tracking-wider text-[#66615B]">
+              {getCategoryIcon(product.category, { className: 'w-6 h-6 mb-1 text-[#CDA66B]' })}
+              <span className="text-[10px] uppercase font-mono tracking-wider text-[#66615B] line-clamp-1">
                 {product.category || 'Piece'}
               </span>
             </div>
@@ -92,14 +93,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, outfitId }) =
           <div>
             {/* Retailer & Category Row */}
             <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 min-w-0">
                 <RetailerLogo retailer={product.retailer} logoUrl={product.retailerLogoUrl} />
               </div>
 
               {product.category && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-[#A77B3D] bg-[#F7F3EB] border border-[#E5DDD0] px-2 py-0.5 rounded-full">
-                  <Tag className="w-2.5 h-2.5" />
-                  {product.category}
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-[#A77B3D] bg-[#F7F3EB] border border-[#E5DDD0] px-2 py-0.5 rounded-full shrink-0">
+                  {getCategoryIcon(product.category, { className: 'w-2.5 h-2.5 text-[#CDA66B]' })}
+                  <span className="truncate max-w-[120px]">{product.category}</span>
                 </span>
               )}
             </div>
@@ -113,7 +114,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, outfitId }) =
           {/* Formatted Price (Only shown when price is valid) */}
           <div className="mt-2">
             {formattedPrice ? (
-              <div className="flex items-baseline gap-2">
+              <div className="flex items-baseline gap-2 flex-wrap">
                 <span className="font-mono text-base font-bold text-[#171717] tabular-nums">
                   {formattedPrice}
                 </span>
@@ -130,7 +131,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, outfitId }) =
         </div>
       </div>
 
-      {/* External Action Button: Clear "Shop Now" */}
+      {/* External Action Button: Clear "Shop Now on [Retailer]" with minimum 44px touch target */}
       <div className="mt-4 pt-3 border-t border-[#E5DDD0]">
         {linkError && (
           <div className="mb-2 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-1.5 flex items-center gap-1.5">
@@ -143,10 +144,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, outfitId }) =
           target="_blank"
           rel="noopener noreferrer"
           onClick={handleShopClick}
-          className="w-full inline-flex items-center justify-center gap-2 bg-[#CDA66B] hover:bg-[#A77B3D] active:bg-[#8E652E] text-[#FFFFFF] font-semibold text-xs px-4 py-2.5 rounded-xl transition shadow-xs hover:shadow cursor-pointer"
+          className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 bg-[#CDA66B] hover:bg-[#A77B3D] active:bg-[#8E652E] text-[#FFFFFF] font-semibold text-xs px-4 py-2.5 rounded-xl transition shadow-xs hover:shadow cursor-pointer select-none"
         >
-          <span>{isRedirecting ? 'Opening Retailer...' : `Shop Now on ${product.retailer}`}</span>
-          <ExternalLink className="w-3.5 h-3.5" />
+          <span>{isRedirecting ? 'Opening Retailer...' : `Shop Now on ${product.retailer || 'Store'}`}</span>
+          <ExternalLink className="w-3.5 h-3.5 shrink-0" />
         </a>
       </div>
     </div>
