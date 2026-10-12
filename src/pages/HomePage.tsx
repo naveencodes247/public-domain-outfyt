@@ -4,6 +4,7 @@ import { Link, useNavigate } from '../router/Router';
 import { OutfitCard } from '../components/outfit/OutfitCard';
 import { getPublishedOutfits, subscribeToPublishedOutfits } from '../firebase/services/outfits';
 import { Outfit } from '../types/schema';
+import { getAllCategories, getCuratedHomepageCategories } from '../firebase/services/categories';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
@@ -11,6 +12,7 @@ export const HomePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [curatedCategories, setCuratedCategories] = useState<string[]>(getCuratedHomepageCategories());
 
   const loadData = () => {
     setLoading(true);
@@ -49,6 +51,12 @@ export const HomePage: React.FC = () => {
       }
     );
 
+    getAllCategories().then((cats) => {
+      if (isMounted) {
+        setCuratedCategories(getCuratedHomepageCategories(cats));
+      }
+    });
+
     return () => {
       isMounted = false;
       unsubscribe();
@@ -75,17 +83,6 @@ export const HomePage: React.FC = () => {
       navigate(`/search?q=${encodeURIComponent(query)}`);
     }
   };
-
-  const categories = [
-    'Casual',
-    'Streetwear',
-    'Ethnic',
-    'Minimal',
-    'Partywear',
-    'Office Wear',
-    'Summer',
-    'Winter',
-  ];
 
   return (
     <div className="space-y-12 sm:space-y-16 pb-16">
@@ -230,7 +227,7 @@ export const HomePage: React.FC = () => {
               </h3>
             </div>
             <Link
-              to="/discover"
+              to="/categories"
               className="text-xs text-[#A77B3D] hover:underline font-semibold"
             >
               All Categories &rarr;
@@ -238,7 +235,7 @@ export const HomePage: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {categories.map((cat) => (
+            {curatedCategories.map((cat) => (
               <Link
                 key={cat}
                 to={`/discover?cat=${encodeURIComponent(cat)}`}

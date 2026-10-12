@@ -53,3 +53,19 @@ export interface AdminUser {
   role: AdminRole;
   createdAt: Timestamp | string;
 }
+
+export type CategoryGroup = 'Everyday' | 'Occasions' | 'Seasonal' | 'Style' | 'Custom';
+
+export interface Category {
+  id: string; // URL-safe or slug, e.g. "streetwear", "diwali-2026"
+  name: string; // e.g. "Diwali 2026"
+  group?: CategoryGroup;
+  description?: string;
+  tagline?: string;
+  accent?: string;
+  imageUrl?: string | null;
+  isCustom?: boolean;
+  archived?: boolean;
+  createdAt?: Timestamp | string;
+  updatedAt?: Timestamp | string;
+}

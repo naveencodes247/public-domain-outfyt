@@ -4,6 +4,7 @@ import { useSearchParams } from '../router/Router';
 import { OutfitCard } from '../components/outfit/OutfitCard';
 import { getPublishedOutfits } from '../firebase/services/outfits';
 import { Outfit } from '../types/schema';
+import { getAllCategories, STARTER_CATEGORIES } from '../firebase/services/categories';
 
 export const DiscoverPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -14,8 +15,28 @@ export const DiscoverPage: React.FC = () => {
   );
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [sortBy, setSortBy] = useState<'latest' | 'title'>('latest');
+  const [categories, setCategories] = useState<string[]>([
+    'All',
+    ...STARTER_CATEGORIES.map((c) => c.name),
+  ]);
 
-  const categories = ['All', 'Streetwear', 'Ethnic', 'Minimal', 'Casual', 'Partywear', 'Office Wear', 'Summer', 'Winter'];
+  useEffect(() => {
+    let isMounted = true;
+    getAllCategories().then((cats) => {
+      if (isMounted) {
+        const list = ['All', ...cats.map((c) => c.name)];
+        // Include any custom URL category if passed
+        const urlCat = searchParams.get('cat');
+        if (urlCat && !list.includes(urlCat)) {
+          list.push(urlCat);
+        }
+        setCategories(Array.from(new Set(list)));
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [searchParams]);
 
   useEffect(() => {
     let isMounted = true;

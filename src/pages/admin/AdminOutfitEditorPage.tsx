@@ -24,7 +24,16 @@ import {
   deleteProductsByOutfitId,
 } from '../../firebase/services/products';
 import { uploadOutfitMedia, validateMediaFile } from '../../firebase/services/storage';
-import { MediaType } from '../../types/schema';
+import {
+  getAllCategories,
+  createCustomCategory,
+  STARTER_CATEGORIES,
+} from '../../firebase/services/categories';
+import {
+  PRODUCT_CATEGORY_GROUPS,
+  ALL_PRODUCT_CATEGORIES,
+} from '../../utils/productCategories';
+import { MediaType, Category, CategoryGroup } from '../../types/schema';
 
 interface ProductItemState {
   id?: string;
@@ -33,30 +42,13 @@ interface ProductItemState {
   category?: string;
   retailerLogoUrl?: string;
   isCustomRetailer?: boolean;
+  isCustomCategory?: boolean;
   price: string;
   currency: string;
   affiliateUrl: string;
   imageUrl: string;
   sortOrder: number;
 }
-
-const PRODUCT_CATEGORIES = [
-  'Shirt',
-  'T-Shirt',
-  'Pants / Trousers',
-  'Jeans',
-  'Footwear / Shoes',
-  'Sneakers',
-  'Jacket / Blazer',
-  'Kurta',
-  'Dress',
-  'Accessory',
-  'Watch',
-  'Bag',
-  'Sunglasses',
-  'Jewelry',
-  'Other',
-];
 
 const INDIAN_RETAILERS = [
   'Amazon India',
@@ -107,6 +99,49 @@ export const AdminOutfitEditorPage: React.FC = () => {
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadStatusMsg, setUploadStatusMsg] = useState<string | null>(null);
 
+  // Dynamic Categories & Custom Occasion Creation State
+  const [availableCategories, setAvailableCategories] = useState<Category[]>(STARTER_CATEGORIES);
+  const [showCreateCategoryModal, setShowCreateCategoryModal] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatGroup, setNewCatGroup] = useState<CategoryGroup>('Occasions');
+  const [newCatDesc, setNewCatDesc] = useState('');
+  const [creatingCategory, setCreatingCategory] = useState(false);
+
+  // Load available categories on component mount
+  useEffect(() => {
+    let isMounted = true;
+    getAllCategories().then((cats) => {
+      if (isMounted) setAvailableCategories(cats);
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Handler to create a custom occasion/category without code deployments
+  const handleCreateOccasion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCatName.trim()) return;
+    setCreatingCategory(true);
+    try {
+      const created = await createCustomCategory({
+        name: newCatName.trim(),
+        group: newCatGroup,
+        description: newCatDesc.trim() || undefined,
+      });
+      setAvailableCategories((prev) => [created, ...prev]);
+      setCategory(created.name);
+      setSuccessMsg(`Category "${created.name}" created and selected!`);
+      setShowCreateCategoryModal(false);
+      setNewCatName('');
+      setNewCatDesc('');
+    } catch (err: any) {
+      setErrorMsg(`Failed to create category: ${err.message}`);
+    } finally {
+      setCreatingCategory(false);
+    }
+  };
+
   // Product Items
   const [products, setProducts] = useState<ProductItemState[]>([
     {
@@ -115,6 +150,7 @@ export const AdminOutfitEditorPage: React.FC = () => {
       category: 'Shirt',
       retailerLogoUrl: '',
       isCustomRetailer: false,
+      isCustomCategory: false,
       price: '',
       currency: 'INR',
       affiliateUrl: '',
@@ -150,14 +186,16 @@ export const AdminOutfitEditorPage: React.FC = () => {
           if (items.length > 0) {
             setProducts(
               items.map((p, idx) => {
-                const isKnown = INDIAN_RETAILERS.includes(p.retailer);
+                const isKnownRetailer = INDIAN_RETAILERS.includes(p.retailer);
+                const isKnownCategory = p.category ? ALL_PRODUCT_CATEGORIES.includes(p.category) : true;
                 return {
                   id: p.id,
                   name: p.name,
                   retailer: p.retailer,
                   category: p.category || '',
                   retailerLogoUrl: p.retailerLogoUrl || '',
-                  isCustomRetailer: !isKnown,
+                  isCustomRetailer: !isKnownRetailer,
+                  isCustomCategory: !isKnownCategory,
                   price: p.price ? String(p.price) : '',
                   currency: p.currency || 'INR',
                   affiliateUrl: p.affiliateUrl,
@@ -252,6 +290,16 @@ export const AdminOutfitEditorPage: React.FC = () => {
     } else {
       handleProductChange(index, 'isCustomRetailer', false);
       handleProductChange(index, 'retailer', val);
+    }
+  };
+
+  const handleProductCategorySelect = (index: number, val: string) => {
+    if (val === 'Other (Custom)') {
+      handleProductChange(index, 'isCustomCategory', true);
+      handleProductChange(index, 'category', '');
+    } else {
+      handleProductChange(index, 'isCustomCategory', false);
+      handleProductChange(index, 'category', val);
     }
   };
 
@@ -510,8 +558,6 @@ export const AdminOutfitEditorPage: React.FC = () => {
     }
   };
 
-  const categories = ['Streetwear', 'Ethnic', 'Minimal', 'Casual', 'Partywear', 'Office Wear', 'Summer', 'Winter'];
-
   if (loading) {
     return <div className="p-12 text-center text-xs text-[#66615B]">Loading outfit editor...</div>;
   }
@@ -595,19 +641,38 @@ export const AdminOutfitEditorPage: React.FC = () => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-[#171717]">
-                Category <span className="text-[#A77B3D]">*</span>
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-[#171717]">
+                  Category / Occasion <span className="text-[#A77B3D]">*</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateCategoryModal(true)}
+                  className="text-[11px] text-[#A77B3D] hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>New Occasion</span>
+                </button>
+              </div>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
                 className="w-full bg-[#F7F3EB] border border-[#E5DDD0] rounded-xl px-3.5 py-2.5 text-xs text-[#171717] outline-none focus:border-[#CDA66B]"
               >
-                {categories.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
+                {/* Dynamically grouped categories */}
+                {(['Everyday', 'Occasions', 'Seasonal', 'Style', 'Custom'] as CategoryGroup[]).map((grp) => {
+                  const inGroup = availableCategories.filter((c) => (c.group || 'Custom') === grp);
+                  if (inGroup.length === 0) return null;
+                  return (
+                    <optgroup key={grp} label={grp}>
+                      {inGroup.map((c) => (
+                        <option key={c.id || c.name} value={c.name}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  );
+                })}
               </select>
             </div>
           </div>
@@ -941,19 +1006,49 @@ export const AdminOutfitEditorPage: React.FC = () => {
 
                 {/* Clothing Category Selector */}
                 <div className="sm:col-span-3 space-y-1">
-                  <label className="text-[11px] font-medium text-[#171717]">Clothing Category</label>
-                  <select
-                    value={item.category || ''}
-                    onChange={(e) => handleProductChange(index, 'category', e.target.value)}
-                    className="w-full bg-[#FFFFFF] border border-[#E5DDD0] rounded-lg px-3 py-2 text-xs text-[#171717] outline-none focus:border-[#CDA66B]"
-                  >
-                    <option value="">Select category...</option>
-                    {PRODUCT_CATEGORIES.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-medium text-[#171717]">Clothing Category</label>
+                    {item.isCustomCategory ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleProductChange(index, 'isCustomCategory', false);
+                          handleProductChange(index, 'category', 'Shirt');
+                        }}
+                        className="text-[10px] text-[#66615B] hover:text-[#171717] underline shrink-0 cursor-pointer"
+                      >
+                        Select list
+                      </button>
+                    ) : null}
+                  </div>
+                  {!item.isCustomCategory ? (
+                    <select
+                      value={item.category || ''}
+                      onChange={(e) => handleProductCategorySelect(index, e.target.value)}
+                      className="w-full bg-[#FFFFFF] border border-[#E5DDD0] rounded-lg px-3 py-2 text-xs text-[#171717] outline-none focus:border-[#CDA66B]"
+                    >
+                      <option value="">Select category...</option>
+                      {PRODUCT_CATEGORY_GROUPS.map((grp) => (
+                        <optgroup key={grp.groupName} label={grp.groupName}>
+                          {grp.items.map((cat) => (
+                            <option key={cat} value={cat}>
+                              {cat}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        value={item.category || ''}
+                        onChange={(e) => handleProductChange(index, 'category', e.target.value)}
+                        placeholder="e.g. Bandhgala, Waistcoat"
+                        className="w-full bg-[#FFFFFF] border border-[#E5DDD0] rounded-lg px-3 py-2 text-xs text-[#171717] outline-none focus:border-[#CDA66B]"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Retailer Selector for Indian Market */}
@@ -1083,6 +1178,96 @@ export const AdminOutfitEditorPage: React.FC = () => {
           {saving ? 'Saving...' : 'Publish to Catalog'}
         </button>
       </div>
+
+      {/* Create Occasion / Category Modal */}
+      {showCreateCategoryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+          <div className="bg-[#FFFFFF] rounded-2xl border border-[#E5DDD0] max-w-md w-full p-6 shadow-xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[#E5DDD0]">
+              <h3 className="text-base font-semibold text-[#171717]">
+                Create Occasion or Category
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowCreateCategoryModal(false)}
+                className="p-1 text-[#66615B] hover:text-[#171717] rounded-lg transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateOccasion} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-[#171717]">
+                  Category / Occasion Name <span className="text-[#A77B3D]">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newCatName}
+                  onChange={(e) => setNewCatName(e.target.value)}
+                  placeholder="e.g. Diwali 2026, College Fest, Eid Collection"
+                  className="w-full bg-[#F7F3EB] border border-[#E5DDD0] rounded-xl px-3.5 py-2.5 text-xs text-[#171717] outline-none focus:border-[#CDA66B]"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-[#171717]">
+                  Group / Classification
+                </label>
+                <select
+                  value={newCatGroup}
+                  onChange={(e) => setNewCatGroup(e.target.value as CategoryGroup)}
+                  className="w-full bg-[#F7F3EB] border border-[#E5DDD0] rounded-xl px-3.5 py-2.5 text-xs text-[#171717] outline-none focus:border-[#CDA66B]"
+                >
+                  <option value="Occasions">Occasions (Festivals, Events, Weddings)</option>
+                  <option value="Everyday">Everyday (Casual, Streetwear, Daily)</option>
+                  <option value="Seasonal">Seasonal (Summer, Winter, Monsoon)</option>
+                  <option value="Style">Style (Old Money, Y2K, Athleisure)</option>
+                  <option value="Custom">Custom / Special Edition</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-[#171717]">
+                  Description (optional)
+                </label>
+                <textarea
+                  rows={2}
+                  value={newCatDesc}
+                  onChange={(e) => setNewCatDesc(e.target.value)}
+                  placeholder="e.g. Curated festive fits, ethnic silhouettes and celebratory styling."
+                  className="w-full bg-[#F7F3EB] border border-[#E5DDD0] rounded-xl px-3.5 py-2.5 text-xs text-[#171717] outline-none focus:border-[#CDA66B] resize-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateCategoryModal(false)}
+                  className="px-4 py-2 rounded-xl border border-[#E5DDD0] bg-[#FFFFFF] hover:bg-[#F7F3EB] text-xs text-[#66615B] cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingCategory || !newCatName.trim()}
+                  className="bg-[#CDA66B] hover:bg-[#A77B3D] text-[#FFFFFF] text-xs font-semibold px-4 py-2 rounded-xl transition shadow-xs flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                >
+                  {creatingCategory ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Creating...</span>
+                    </>
+                  ) : (
+                    <span>Create & Select</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
