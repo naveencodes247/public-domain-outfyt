@@ -1,0 +1,224 @@
+{
+  "entities": {
+    "Outfit": {
+      "title": "Outfit",
+      "description": "An outfit look curated from social platforms with dedicated identifier and details.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique business identifier such as OUT-001",
+          "pattern": "^OUT-[0-9]{3,}$"
+        },
+        "slug": {
+          "type": "string",
+          "description": "URL-safe unique slug for outfit page",
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "title": {
+          "type": "string",
+          "description": "Outfit display title",
+          "minLength": 3,
+          "maxLength": 120
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description of the outfit styling and occasion",
+          "maxLength": 2000
+        },
+        "category": {
+          "type": "string",
+          "description": "Primary fashion category (e.g. Ethnic, Casual, Streetwear, Formal)",
+          "maxLength": 50
+        },
+        "tags": {
+          "type": "array",
+          "description": "Searchable keywords and occasion tags (max 10 tags)"
+        },
+        "heroImageUrl": {
+          "type": "string",
+          "description": "Legacy direct URL for the primary outfit image",
+          "maxLength": 1000
+        },
+        "heroMediaType": {
+          "type": "string",
+          "description": "Hero media format type: image or video",
+          "enum": ["image", "video"]
+        },
+        "heroMediaUrl": {
+          "type": "string",
+          "description": "Direct URL for the primary outfit hero image or video file",
+          "maxLength": 1000
+        },
+        "heroThumbnailUrl": {
+          "type": "string",
+          "description": "Optional poster or thumbnail image URL for videos or cards",
+          "maxLength": 1000
+        },
+        "heroMediaAlt": {
+          "type": "string",
+          "description": "Descriptive accessibility alt text for hero visual",
+          "maxLength": 200
+        },
+        "status": {
+          "type": "string",
+          "description": "Workflow publication state",
+          "enum": ["draft", "published", "archived"]
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Server timestamp of creation"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Server timestamp of last update"
+        },
+        "publishedAt": {
+          "type": "string",
+          "description": "Server timestamp of publication when published"
+        }
+      },
+      "required": ["id", "slug", "title", "description", "category", "tags", "status", "createdAt", "updatedAt"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "An individual fashion product belonging to an outfit with affiliate purchase link.",
+      "type": "object",
+      "properties": {
+        "outfitId": {
+          "type": "string",
+          "description": "Reference to the parent outfit business identifier or document ID",
+          "maxLength": 64
+        },
+        "name": {
+          "type": "string",
+          "description": "Product title or item name",
+          "minLength": 2,
+          "maxLength": 150
+        },
+        "retailer": {
+          "type": "string",
+          "description": "Retailer partner name (e.g., Myntra, Zara, H&M, Amazon)",
+          "maxLength": 80
+        },
+        "category": {
+          "type": "string",
+          "description": "Optional clothing category (e.g., Shirt, Pants, Shoes, Accessory)",
+          "maxLength": 50
+        },
+        "retailerLogoUrl": {
+          "type": "string",
+          "description": "Optional direct retailer logo image URL",
+          "maxLength": 1000
+        },
+        "price": {
+          "type": "number",
+          "description": "Approximate or retail price value"
+        },
+        "currency": {
+          "type": "string",
+          "description": "ISO currency code (defaults to INR)",
+          "maxLength": 3
+        },
+        "affiliateUrl": {
+          "type": "string",
+          "description": "Affiliate tracking or redirect URL for external retailer purchase",
+          "maxLength": 1000
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "Optional direct product image URL",
+          "maxLength": 1000
+        },
+        "sortOrder": {
+          "type": "number",
+          "description": "Display order index inside the outfit listing"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Update timestamp"
+        }
+      },
+      "required": ["outfitId", "name", "retailer", "currency", "affiliateUrl", "sortOrder", "createdAt", "updatedAt"]
+    },
+    "ClickEvent": {
+      "title": "ClickEvent",
+      "description": "Minimal outbound affiliate click tracking record.",
+      "type": "object",
+      "properties": {
+        "outfitId": {
+          "type": "string",
+          "description": "Outfit ID clicked",
+          "maxLength": 64
+        },
+        "productId": {
+          "type": "string",
+          "description": "Product document ID clicked",
+          "maxLength": 64
+        },
+        "retailer": {
+          "type": "string",
+          "description": "Retailer associated with the link",
+          "maxLength": 80
+        },
+        "clickedAt": {
+          "type": "string",
+          "description": "Server timestamp of the click event"
+        }
+      },
+      "required": ["outfitId", "productId", "retailer", "clickedAt"]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "Authorized administrator profile record.",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Verified Google account email address",
+          "maxLength": 120
+        },
+        "role": {
+          "type": "string",
+          "description": "Role designation",
+          "enum": ["super_admin", "editor"]
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when admin status was established"
+        }
+      },
+      "required": ["email", "role", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/outfits/{outfitId}": {
+      "schema": {
+        "$ref": "#/entities/Outfit"
+      },
+      "description": "Fashion outfits curated from Instagram, YouTube, Pinterest, etc."
+    },
+    "/products/{productId}": {
+      "schema": {
+        "$ref": "#/entities/Product"
+      },
+      "description": "Individual items associated with specific outfits with affiliate links."
+    },
+    "/clickEvents/{clickEventId}": {
+      "schema": {
+        "$ref": "#/entities/ClickEvent"
+      },
+      "description": "Telemetry for outbound affiliate clicks."
+    },
+    "/admins/{adminId}": {
+      "schema": {
+        "$ref": "#/entities/Admin"
+      },
+      "description": "Administrator allowlist mapping authenticated UIDs to roles."
+    }
+  }
+}
