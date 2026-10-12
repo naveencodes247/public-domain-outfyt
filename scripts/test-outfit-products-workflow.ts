@@ -203,7 +203,7 @@ function runTests() {
   // ========================================================
   console.log('Test 4: Verify firestore.rules allows public get/list and validates Product fields');
   const rulesPath = path.join(process.cwd(), 'firestore.rules');
-  const rulesContent = fs.readFileSync(rulesPath, 'utf-8');
+  const rulesContent = fs.readFileSync(rulesPath, 'utf-8').replace(/\r\n/g, '\n');
 
   assert(
     rulesContent.includes('match /products/{productId}'),
