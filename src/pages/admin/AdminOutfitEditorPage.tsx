@@ -16,7 +16,9 @@ import {
   Loader2,
   X,
   RefreshCw,
+  AlertTriangle,
 } from 'lucide-react';
+import { auth } from '../../firebase/config';
 import { getOutfitById, createOutfit, updateOutfit } from '../../firebase/services/outfits';
 import {
   getProductsByOutfitId,
@@ -93,6 +95,11 @@ export const AdminOutfitEditorPage: React.FC = () => {
   const [heroMediaUrl, setHeroMediaUrl] = useState('');
   const [heroThumbnailUrl, setHeroThumbnailUrl] = useState('');
   const [heroMediaAlt, setHeroMediaAlt] = useState('');
+
+  // Media Visual Preview and Upload Status
+  type MediaStatus = 'idle' | 'local_preview' | 'uploading' | 'upload_complete' | 'upload_failed' | 'saved' | 'published';
+  const [previewUrl, setPreviewUrl] = useState('');
+  const [mediaStatus, setMediaStatus] = useState<MediaStatus>('idle');
 
   // Media Upload State
   const [isUploading, setIsUploading] = useState(false);
@@ -177,9 +184,12 @@ export const AdminOutfitEditorPage: React.FC = () => {
 
           // Resolve media fields with backwards compatibility
           setHeroMediaType(existing.heroMediaType || 'image');
-          setHeroMediaUrl(existing.heroMediaUrl || existing.heroImageUrl || '');
+          const initialMedia = existing.heroMediaUrl || existing.heroImageUrl || '';
+          setHeroMediaUrl(initialMedia);
+          setPreviewUrl(initialMedia);
           setHeroThumbnailUrl(existing.heroThumbnailUrl || '');
           setHeroMediaAlt(existing.heroMediaAlt || '');
+          setMediaStatus(initialMedia ? (existing.status === 'published' ? 'published' : 'saved') : 'idle');
 
           // Load products
           const items = await getProductsByOutfitId(existing.id);
@@ -317,29 +327,44 @@ export const AdminOutfitEditorPage: React.FC = () => {
       return;
     }
 
-    // Set immediate preview
+    // Set immediate visual preview via dedicated previewUrl, NOT setting heroMediaUrl to a blob
     const localPreview = URL.createObjectURL(file);
-    setHeroMediaUrl(localPreview);
+    setPreviewUrl(localPreview);
     setHeroMediaType(validation.detectedType);
+    setMediaStatus('uploading');
 
     setIsUploading(true);
     setUploadProgress(0);
-    setUploadStatusMsg(`Uploading ${file.name} to persistent storage...`);
+    setUploadStatusMsg(`Uploading ${file.name} to persistent Supabase Storage...`);
 
     try {
+      const idToken = await auth.currentUser?.getIdToken();
       const result = await uploadOutfitMedia(file, outfitId || 'temp', {
         expectedType: validation.detectedType,
+        idToken,
         onProgress: (pct) => setUploadProgress(pct),
       });
+
+      // Cleanup local blob preview URL
+      if (localPreview.startsWith('blob:')) {
+        URL.revokeObjectURL(localPreview);
+      }
+
       setHeroMediaUrl(result.downloadUrl);
+      setPreviewUrl(result.downloadUrl);
       setHeroMediaType(result.mediaType);
-      setUploadStatusMsg('Uploaded successfully! Media is saved to persistent storage.');
-      setSuccessMsg('Media uploaded successfully to Firebase Storage.');
+      setMediaStatus('upload_complete');
+      setUploadStatusMsg('Uploaded successfully! Media is saved to persistent Supabase Storage.');
+      setSuccessMsg('Media uploaded successfully to Supabase Storage.');
     } catch (uploadErr: any) {
       setErrorMsg(uploadErr.message || 'Media upload failed.');
       setUploadStatusMsg(null);
-      // Revoke broken preview
-      setHeroMediaUrl('');
+      setMediaStatus('upload_failed');
+      if (localPreview.startsWith('blob:')) {
+        URL.revokeObjectURL(localPreview);
+      }
+      // Revert preview back to existing permanent media URL if present
+      setPreviewUrl(heroMediaUrl);
     } finally {
       setIsUploading(false);
       setUploadProgress(null);
@@ -361,15 +386,17 @@ export const AdminOutfitEditorPage: React.FC = () => {
 
     setIsUploading(true);
     setUploadProgress(0);
-    setUploadStatusMsg(`Uploading poster ${file.name}...`);
+    setUploadStatusMsg(`Uploading poster ${file.name} to persistent Supabase Storage...`);
 
     try {
+      const idToken = await auth.currentUser?.getIdToken();
       const result = await uploadOutfitMedia(file, `${outfitId || 'temp'}-poster`, {
         expectedType: 'image',
+        idToken,
         onProgress: (pct) => setUploadProgress(pct),
       });
       setHeroThumbnailUrl(result.downloadUrl);
-      setUploadStatusMsg('Poster image uploaded successfully to persistent storage.');
+      setUploadStatusMsg('Poster image uploaded successfully to persistent Supabase Storage.');
     } catch (err: any) {
       setErrorMsg(`Poster upload failed: ${err.message}`);
     } finally {
@@ -380,7 +407,12 @@ export const AdminOutfitEditorPage: React.FC = () => {
   };
 
   const handleRemoveMedia = () => {
+    if (previewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(previewUrl);
+    }
     setHeroMediaUrl('');
+    setPreviewUrl('');
+    setMediaStatus('idle');
     setUploadStatusMsg(null);
   };
 
@@ -418,8 +450,13 @@ export const AdminOutfitEditorPage: React.FC = () => {
       return;
     }
 
+    if (isUploading) {
+      setErrorMsg('Media is currently uploading. Please wait for upload to complete before saving.');
+      return;
+    }
+
     if (heroMediaUrl.startsWith('blob:')) {
-      setErrorMsg('Media upload is still in progress. Please wait for upload to complete before saving.');
+      setErrorMsg('Cannot save temporary preview URL. Please wait for media upload to finish.');
       return;
     }
 
@@ -537,6 +574,7 @@ export const AdminOutfitEditorPage: React.FC = () => {
         });
       }
 
+      setMediaStatus(finalStatus === 'published' ? 'published' : 'saved');
       setSuccessMsg(`Outfit ${trimmedId} saved successfully as ${finalStatus.toUpperCase()}!`);
       setTimeout(() => {
         navigate('/admin/outfits');
@@ -585,16 +623,16 @@ export const AdminOutfitEditorPage: React.FC = () => {
           <button
             type="button"
             onClick={() => handleSave('draft')}
-            disabled={saving}
-            className="px-4 py-2.5 rounded-xl border border-[#E5DDD0] bg-[#FFFFFF] hover:bg-[#F7F3EB] text-[#171717] text-xs font-semibold transition cursor-pointer"
+            disabled={saving || isUploading}
+            className="px-4 py-2.5 rounded-xl border border-[#E5DDD0] bg-[#FFFFFF] hover:bg-[#F7F3EB] text-[#171717] text-xs font-semibold transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Save Draft
           </button>
           <button
             type="button"
             onClick={() => handleSave('published')}
-            disabled={saving}
-            className="bg-[#CDA66B] hover:bg-[#A77B3D] text-[#FFFFFF] font-semibold text-xs px-5 py-2.5 rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+            disabled={saving || isUploading}
+            className="bg-[#CDA66B] hover:bg-[#A77B3D] text-[#FFFFFF] font-semibold text-xs px-5 py-2.5 rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <CheckCircle2 className="w-4 h-4" />
             <span>{saving ? 'Saving...' : 'Publish Look'}</span>
@@ -801,7 +839,7 @@ export const AdminOutfitEditorPage: React.FC = () => {
                 <div className="flex items-center justify-between text-xs text-[#171717]">
                   <span className="flex items-center gap-1 text-[11px] font-medium text-[#A77B3D]">
                     <Loader2 className="w-3 h-3 animate-spin" />
-                    <span>Uploading to Firebase Storage...</span>
+                    <span>Uploading to Supabase Storage...</span>
                   </span>
                   <span className="font-mono text-xs font-bold text-[#CDA66B]">{uploadProgress}%</span>
                 </div>
@@ -844,7 +882,12 @@ export const AdminOutfitEditorPage: React.FC = () => {
               type="url"
               required
               value={heroMediaUrl}
-              onChange={(e) => setHeroMediaUrl(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setHeroMediaUrl(val);
+                setPreviewUrl(val);
+                setMediaStatus(val.trim() ? 'saved' : 'idle');
+              }}
               placeholder={heroMediaType === 'video' ? 'https://example.com/reel.mp4' : 'https://example.com/look.jpg'}
               className="w-full bg-[#F7F3EB] border border-[#E5DDD0] rounded-xl px-3.5 py-2.5 text-xs text-[#171717] outline-none focus:border-[#CDA66B]"
             />
@@ -883,18 +926,36 @@ export const AdminOutfitEditorPage: React.FC = () => {
           <div className="space-y-1.5 pt-1">
             <div className="flex items-center justify-between">
               <label className="text-xs font-medium text-[#66615B]">Interactive Media Preview</label>
-              {heroMediaUrl && (
-                <span className="text-[10px] text-emerald-700 font-medium flex items-center gap-1">
+              {mediaStatus === 'uploading' && (
+                <span className="text-[10px] text-amber-700 font-medium flex items-center gap-1 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                  <Loader2 className="w-3 h-3 text-amber-600 animate-spin" />
+                  Uploading ({uploadProgress ?? 0}%)
+                </span>
+              )}
+              {mediaStatus === 'upload_failed' && (
+                <span className="text-[10px] text-red-700 font-medium flex items-center gap-1 bg-red-50 px-2 py-0.5 rounded-full border border-red-200">
+                  <AlertTriangle className="w-3 h-3 text-red-600" />
+                  Upload Failed
+                </span>
+              )}
+              {mediaStatus === 'local_preview' && (
+                <span className="text-[10px] text-blue-700 font-medium flex items-center gap-1 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                  <ImageIcon className="w-3 h-3 text-blue-600" />
+                  Local Preview
+                </span>
+              )}
+              {heroMediaUrl && !isUploading && (mediaStatus === 'upload_complete' || mediaStatus === 'saved' || mediaStatus === 'published') && (
+                <span className="text-[10px] text-emerald-700 font-medium flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                   <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                   Media Active
                 </span>
               )}
             </div>
             <div className="aspect-[3/4] rounded-xl overflow-hidden bg-[#F7F3EB] border border-[#E5DDD0] flex items-center justify-center relative">
-              {heroMediaUrl ? (
+              {previewUrl || heroMediaUrl ? (
                 heroMediaType === 'video' ? (
                   <video
-                    src={heroMediaUrl}
+                    src={previewUrl || heroMediaUrl}
                     poster={heroThumbnailUrl || undefined}
                     controls
                     playsInline
@@ -903,7 +964,7 @@ export const AdminOutfitEditorPage: React.FC = () => {
                   />
                 ) : (
                   <img
-                    src={heroMediaUrl}
+                    src={previewUrl || heroMediaUrl}
                     alt="Preview"
                     className="w-full h-full object-cover object-top"
                     onError={() => setErrorMsg('Hero media URL could not be loaded.')}
@@ -914,6 +975,13 @@ export const AdminOutfitEditorPage: React.FC = () => {
                   <ImageIcon className="w-8 h-8 mx-auto text-[#66615B]" />
                   <span className="text-xs block font-medium">No media selected</span>
                   <span className="text-[11px] text-[#A77B3D] block">Upload a file or paste a media URL above</span>
+                </div>
+              )}
+              {isUploading && (
+                <div className="absolute inset-0 bg-black/50 backdrop-blur-xs flex flex-col items-center justify-center text-white p-4">
+                  <Loader2 className="w-8 h-8 animate-spin text-[#CDA66B] mb-2" />
+                  <span className="text-xs font-semibold">Uploading to Supabase Storage</span>
+                  <span className="text-sm font-bold text-[#CDA66B] mt-1">{uploadProgress ?? 0}%</span>
                 </div>
               )}
               {outfitId && (
@@ -1164,16 +1232,16 @@ export const AdminOutfitEditorPage: React.FC = () => {
         <button
           type="button"
           onClick={() => handleSave('draft')}
-          disabled={saving}
-          className="px-5 py-2.5 rounded-xl border border-[#E5DDD0] bg-[#FFFFFF] hover:bg-[#F7F3EB] text-[#171717] text-xs font-semibold cursor-pointer"
+          disabled={saving || isUploading}
+          className="px-5 py-2.5 rounded-xl border border-[#E5DDD0] bg-[#FFFFFF] hover:bg-[#F7F3EB] text-[#171717] text-xs font-semibold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Save Draft
         </button>
         <button
           type="button"
           onClick={() => handleSave('published')}
-          disabled={saving}
-          className="bg-[#CDA66B] hover:bg-[#A77B3D] text-[#FFFFFF] font-semibold text-xs px-6 py-2.5 rounded-xl transition shadow-xs cursor-pointer"
+          disabled={saving || isUploading}
+          className="bg-[#CDA66B] hover:bg-[#A77B3D] text-[#FFFFFF] font-semibold text-xs px-6 py-2.5 rounded-xl transition shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {saving ? 'Saving...' : 'Publish to Catalog'}
         </button>
