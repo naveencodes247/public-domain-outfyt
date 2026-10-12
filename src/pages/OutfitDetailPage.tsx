@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, Link } from '../router/Router';
-import { ArrowLeft, Share2, ShieldCheck, ShoppingBag, Check, Play, Volume2, VolumeX, Eye } from 'lucide-react';
+import { ArrowLeft, Share2, ShoppingBag, Check, Play, Volume2, VolumeX, Eye } from 'lucide-react';
 import { ProductCard } from '../components/outfit/ProductCard';
 import { OutfitCard } from '../components/outfit/OutfitCard';
 import { getOutfitBySlug, getOutfitById, getPublishedOutfits } from '../firebase/services/outfits';
@@ -296,17 +296,6 @@ export const OutfitDetailPage: React.FC = () => {
                 Product affiliate destinations for this look are currently being updated by our editorial team.
               </div>
             )}
-          </div>
-
-          {/* Transparent Affiliate Disclosure Box */}
-          <div className="p-4 rounded-xl bg-[#FFFFFF] border border-[#E5DDD0] text-xs text-[#66615B] space-y-1 shadow-xs">
-            <div className="flex items-center gap-1.5 font-semibold text-[#171717]">
-              <ShieldCheck className="w-4 h-4 text-[#CDA66B]" />
-              <span>Affiliate Transparency Disclosure</span>
-            </div>
-            <p className="leading-relaxed">
-              OutFyt.co.in is an independent curation platform and does not sell items directly. When you purchase through the retailer buttons above, we may earn an affiliate commission at no extra charge to you.
-            </p>
           </div>
         </div>
       </div>
