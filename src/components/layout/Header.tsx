@@ -32,10 +32,13 @@ export const Header: React.FC = () => {
     setSearchOpen(false);
     setSearchQuery('');
 
-    // If query matches exact OUT-xxx format, navigate directly to detail page
-    const normalizedId = q.toUpperCase();
-    if (/^OUT-[0-9]{3,}$/.test(normalizedId)) {
-      navigate(`/outfit/${normalizedId.toLowerCase()}`);
+    // Normalize potential ID forms: OUT-001, out-001, out 001, out001
+    const cleanId = q.toUpperCase().replace(/\s+/g, '-');
+    if (/^OUT-[0-9]{3,}$/.test(cleanId)) {
+      navigate(`/outfit/${cleanId.toLowerCase()}`);
+    } else if (/^OUT[0-9]{3,}$/.test(cleanId)) {
+      const formatted = `out-${cleanId.substring(3).toLowerCase()}`;
+      navigate(`/outfit/${formatted}`);
     } else {
       navigate(`/search?q=${encodeURIComponent(q)}`);
     }
@@ -85,22 +88,30 @@ export const Header: React.FC = () => {
               })}
             </nav>
 
-            {/* Zone 3: Search & Mobile Navigation */}
-            <div className="flex items-center gap-3 shrink-0">
+            {/* Zone 3: Search, Admin Shortcut & Mobile Navigation */}
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
               {/* Quick Search Action */}
               <button
                 onClick={() => setSearchOpen(true)}
-                className="flex items-center gap-2 text-xs text-[#66615B] bg-[#FFFFFF] hover:bg-[#EFE6D8]/50 hover:text-[#171717] px-3.5 py-2 rounded-lg border border-[#E5DDD0] transition shadow-xs"
+                className="flex items-center gap-2 text-xs text-[#66615B] bg-[#FFFFFF] hover:bg-[#EFE6D8]/50 hover:text-[#171717] px-3.5 py-2 rounded-lg border border-[#E5DDD0] transition shadow-xs cursor-pointer"
                 aria-label="Search outfits"
               >
                 <Search className="w-3.5 h-3.5 text-[#CDA66B]" />
                 <span className="hidden sm:inline">Search OUT-001...</span>
               </button>
 
+              {/* Compact Admin Link */}
+              <Link
+                to="/admin"
+                className="hidden sm:inline-flex items-center text-xs font-semibold text-[#66615B] hover:text-[#171717] px-2.5 py-2 rounded-lg hover:bg-[#EFE6D8]/60 transition"
+              >
+                Admin
+              </Link>
+
               {/* Mobile Menu Hamburger */}
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="md:hidden p-2 text-[#171717] hover:bg-[#EFE6D8] rounded-lg transition"
+                className="md:hidden p-2 text-[#171717] hover:bg-[#EFE6D8] rounded-lg transition cursor-pointer"
                 aria-label="Toggle navigation menu"
               >
                 {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -122,6 +133,18 @@ export const Header: React.FC = () => {
                   {link.label}
                 </Link>
               ))}
+              <Link
+                to="/categories"
+                className="px-3 py-2 text-sm text-[#171717] hover:bg-[#F7F3EB] rounded-lg font-medium"
+              >
+                Categories
+              </Link>
+              <Link
+                to="/admin"
+                className="px-3 py-2 text-sm font-semibold text-[#A77B3D] hover:bg-[#F7F3EB] rounded-lg"
+              >
+                Admin Portal
+              </Link>
             </nav>
 
             <div className="pt-2 border-t border-[#E5DDD0]">
@@ -130,7 +153,7 @@ export const Header: React.FC = () => {
                   setMobileMenuOpen(false);
                   setSearchOpen(true);
                 }}
-                className="w-full flex items-center justify-between px-3 py-2 text-xs text-[#66615B] bg-[#F7F3EB] rounded-lg border border-[#E5DDD0]"
+                className="w-full flex items-center justify-between px-3 py-2 text-xs text-[#66615B] bg-[#F7F3EB] rounded-lg border border-[#E5DDD0] cursor-pointer"
               >
                 <span>Search by Look ID (OUT-001)...</span>
                 <Search className="w-3.5 h-3.5 text-[#CDA66B]" />
