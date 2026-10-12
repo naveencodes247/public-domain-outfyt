@@ -1,0 +1,185 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny all unknown paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global Security Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (
+          (request.auth.token.email == 'naveencodes247@gmail.com' || request.auth.token.email == 'outfyt.co.in@gmail.com') &&
+          request.auth.token.email_verified == true
+        )
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Validation helper for Outfit
+    function isValidOutfit(data) {
+      return data.keys().hasAll(['id', 'slug', 'title', 'description', 'category', 'tags', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'slug', 'title', 'description', 'category', 'tags', 'heroImageUrl', 'heroMediaType', 'heroMediaUrl', 'heroThumbnailUrl', 'heroMediaAlt', 'status', 'createdAt', 'updatedAt', 'publishedAt'])
+        && data.id is string && data.id.size() >= 4 && data.id.size() <= 32 && data.id.matches('^OUT-[0-9]{3,}$')
+        && data.slug is string && data.slug.size() >= 2 && data.slug.size() <= 100 && data.slug.matches('^[a-z0-9-]+$')
+        && data.title is string && data.title.size() >= 3 && data.title.size() <= 120
+        && data.description is string && data.description.size() <= 2000
+        && data.category is string && data.category.size() >= 2 && data.category.size() <= 50
+        && data.tags is list && data.tags.size() <= 10 && (data.tags.size() == 0 || data.tags[0] is string)
+        && (data.heroImageUrl == null || (data.heroImageUrl is string && data.heroImageUrl.size() <= 1000))
+        && (data.heroMediaUrl == null || (data.heroMediaUrl is string && data.heroMediaUrl.size() <= 1000))
+        && (data.heroMediaType == null || data.heroMediaType in ['image', 'video'])
+        && (data.heroThumbnailUrl == null || (data.heroThumbnailUrl is string && data.heroThumbnailUrl.size() <= 1000))
+        && (data.heroMediaAlt == null || (data.heroMediaAlt is string && data.heroMediaAlt.size() <= 200))
+        && data.status in ['draft', 'published', 'archived']
+        && (data.publishedAt == null || data.publishedAt is timestamp);
+    }
+
+    // Validation helper for Product
+    function isValidProduct(data) {
+      return data.keys().hasAll(['outfitId', 'name', 'retailer', 'currency', 'affiliateUrl', 'sortOrder', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['outfitId', 'name', 'retailer', 'price', 'currency', 'affiliateUrl', 'imageUrl', 'sortOrder', 'createdAt', 'updatedAt'])
+        && data.outfitId is string && data.outfitId.size() >= 4 && data.outfitId.size() <= 64
+        && data.name is string && data.name.size() >= 2 && data.name.size() <= 150
+        && data.retailer is string && data.retailer.size() >= 2 && data.retailer.size() <= 80
+        && (data.price == null || data.price is number)
+        && data.currency is string && data.currency.size() == 3
+        && data.affiliateUrl is string && data.affiliateUrl.size() <= 1000
+        && (data.imageUrl == null || (data.imageUrl is string && data.imageUrl.size() <= 1000))
+        && data.sortOrder is number;
+    }
+
+    // Validation helper for ClickEvent
+    function isValidClickEvent(data) {
+      return data.keys().hasAll(['outfitId', 'productId', 'retailer', 'clickedAt'])
+        && data.keys().hasOnly(['outfitId', 'productId', 'retailer', 'clickedAt'])
+        && data.outfitId is string && data.outfitId.size() <= 64
+        && data.productId is string && data.productId.size() <= 64
+        && data.retailer is string && data.retailer.size() <= 80;
+    }
+
+    // Validation helper for Admin
+    function isValidAdmin(data) {
+      return data.keys().hasAll(['email', 'role', 'createdAt'])
+        && data.keys().hasOnly(['email', 'role', 'createdAt'])
+        && data.email is string && data.email.size() <= 120
+        && data.role in ['super_admin', 'editor'];
+    }
+
+    // ----------------------------------------------------
+    // Collection: outfits
+    // ----------------------------------------------------
+    match /outfits/{outfitId} {
+      // Single-document read
+      allow get: if isValidId(outfitId) && (resource.data.status == 'published' || isAdmin());
+
+      // Query / list: public can only query published outfits; admin can list all
+      allow list: if (resource.data.status == 'published') || isAdmin();
+
+      // Create: Verified Admin only
+      allow create: if isValidId(outfitId)
+        && isAdmin()
+        && isValidOutfit(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      // Update: Verified Admin only with immutable id and createdAt
+      allow update: if isValidId(outfitId)
+        && isAdmin()
+        && isValidOutfit(incoming())
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time;
+
+      // Delete: Verified Admin only
+      allow delete: if isValidId(outfitId) && isAdmin();
+    }
+
+    // ----------------------------------------------------
+    // Collection: products
+    // ----------------------------------------------------
+    match /products/{productId} {
+      // Public visitors can view individual product if its outfit is published
+      allow get: if isValidId(productId) && (
+        isAdmin() ||
+        (
+          resource.data.outfitId is string &&
+          get(/databases/$(database)/documents/outfits/$(resource.data.outfitId)).data.status == 'published'
+        )
+      );
+
+      // Query / list products (no expensive get() in list rule)
+      allow list: if isAdmin() || (resource.data.outfitId is string);
+
+      // Create: Admin only, parent outfit must exist
+      allow create: if isValidId(productId)
+        && isAdmin()
+        && isValidProduct(incoming())
+        && exists(/databases/$(database)/documents/outfits/$(incoming().outfitId))
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      // Update: Admin only, immutable parent reference and createdAt
+      allow update: if isValidId(productId)
+        && isAdmin()
+        && isValidProduct(incoming())
+        && incoming().outfitId == existing().outfitId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time;
+
+      // Delete: Admin only
+      allow delete: if isValidId(productId) && isAdmin();
+    }
+
+    // ----------------------------------------------------
+    // Collection: clickEvents
+    // ----------------------------------------------------
+    match /clickEvents/{clickEventId} {
+      // Append-only click recording from visitors
+      allow create: if isValidId(clickEventId)
+        && isValidClickEvent(incoming())
+        && incoming().clickedAt == request.time
+        && exists(/databases/$(database)/documents/outfits/$(incoming().outfitId));
+
+      // Telemetry read and list restricted strictly to admins
+      allow get: if isValidId(clickEventId) && isAdmin();
+      allow list: if isAdmin();
+      allow update: if false;
+      allow delete: if isValidId(clickEventId) && isAdmin();
+    }
+
+    // ----------------------------------------------------
+    // Collection: admins
+    // ----------------------------------------------------
+    match /admins/{adminId} {
+      allow get: if isValidId(adminId) && isAdmin();
+      allow list: if isAdmin();
+      allow create: if isValidId(adminId) && isAdmin() && isValidAdmin(incoming()) && incoming().createdAt == request.time;
+      allow update: if isValidId(adminId) && isAdmin() && isValidAdmin(incoming()) && incoming().createdAt == existing().createdAt;
+      allow delete: if isValidId(adminId) && isAdmin();
+    }
+  }
+}
