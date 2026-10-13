@@ -208,7 +208,7 @@ export const AdminOutfitEditorPage: React.FC = () => {
                   retailerLogoUrl: p.retailerLogoUrl || '',
                   isCustomRetailer: !isKnownRetailer,
                   isCustomCategory: !isKnownCategory,
-                  price: p.price ? String(p.price) : '',
+                  price: (p.price !== undefined && p.price !== null) ? String(p.price) : '',
                   currency: p.currency || 'INR',
                   affiliateUrl: p.affiliateUrl,
                   imageUrl: p.imageUrl || '',
@@ -459,6 +459,11 @@ export const AdminOutfitEditorPage: React.FC = () => {
 
     if (heroMediaUrl.startsWith('blob:')) {
       setErrorMsg('Cannot save temporary preview URL. Please wait for media upload to finish.');
+      return;
+    }
+
+    if (heroThumbnailUrl && heroThumbnailUrl.startsWith('blob:')) {
+      setErrorMsg('Cannot save temporary video thumbnail URL. Please wait for thumbnail upload to finish.');
       return;
     }
 

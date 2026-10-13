@@ -13,8 +13,7 @@ import { Link } from '../../router/Router';
 import { auth } from '../../firebase/config';
 import { testFirestoreConnection, ConnectionTestResult } from '../../firebase/testConnection';
 import { checkAdminStatus, AdminStatus } from '../../firebase/services/admin';
-import { updateOutfit, createOutfit } from '../../firebase/services/outfits';
-import { createProduct, deleteProductsByOutfitId } from '../../firebase/services/products';
+import { seedEditorialPresets } from '../../firebase/services/outfits';
 import { SAMPLE_EDITORIAL_PRESETS } from '../../assets/sampleAssets';
 import firebaseConfig from '../../../firebase-applet-config.json';
 
@@ -51,27 +50,8 @@ export const AdminSettingsPage: React.FC = () => {
     setSeeding(true);
     setMsg('Writing presets to Cloud Firestore...');
     try {
-      for (const preset of SAMPLE_EDITORIAL_PRESETS) {
-        const { products, ...outfitData } = preset;
-        await updateOutfit(preset.id, outfitData).catch(async () => {
-          await createOutfit(outfitData as any);
-        });
-
-        await deleteProductsByOutfitId(preset.id);
-        for (const p of products) {
-          await createProduct(p.id, {
-            outfitId: preset.id,
-            name: p.name,
-            retailer: p.retailer,
-            price: p.price,
-            currency: p.currency,
-            affiliateUrl: p.affiliateUrl,
-            imageUrl: p.imageUrl || null,
-            sortOrder: p.sortOrder,
-          });
-        }
-      }
-      setMsg('Successfully initialized 4 curated looks in Cloud Firestore!');
+      await seedEditorialPresets(SAMPLE_EDITORIAL_PRESETS);
+      setMsg('Successfully initialized curated looks in Cloud Firestore!');
     } catch (err: any) {
       alert(`Error initializing presets: ${err.message}`);
     } finally {

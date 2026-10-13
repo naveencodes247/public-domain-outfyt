@@ -14,6 +14,7 @@ import AffiliateDisclosurePage from './pages/AffiliateDisclosurePage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import TermsPage from './pages/TermsPage';
 import ContactPage from './pages/ContactPage';
+import NotFoundPage from './pages/NotFoundPage';
 
 // Admin Pages
 import AdminRouteGuard from './components/admin/AdminRouteGuard';
@@ -101,8 +102,8 @@ function AppContent() {
       );
     }
 
-    // Fallback: Default to Home
-    return <HomePage />;
+    // Fallback: 404 Not Found
+    return <NotFoundPage />;
   };
 
   return (
