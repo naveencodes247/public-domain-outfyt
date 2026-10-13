@@ -1,23 +1,34 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# OutFyt.co.in — Fashion Discovery Affiliate Platform
 
-# Run and deploy your AI Studio app
+OutFyt.co.in curates complete outfits featured across social platforms (Instagram, YouTube, Pinterest) and connects visitors with individual clothing pieces and verified affiliate retailer links.
 
-This contains everything you need to run your app locally.
-
-View your app in AI Studio: https://ai.studio/apps/f3920ea2-7315-4751-a131-cd9f6a4343b9
+- **Frontend**: React 19, TypeScript, Vite, TailwindCSS
+- **Backend Services**: Firebase Authentication & Cloud Firestore (Named DB: `ai-studio-outfytcoin-f3920ea2-7315-4751-a131-cd9f6a4343b9`)
+- **Media Storage**: Supabase Storage (`outfit-media` bucket via signed upload edge functions)
+- **Hosting**: Netlify (`outfythere.netlify.app`)
 
 ## Run Locally
 
-**Prerequisites:**  Node.js
-
+**Prerequisites:** Node.js 18+
 
 1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+   ```bash
+   npm install
+   ```
+2. Configure `.env.local` by copying `.env.example`:
+   ```bash
+   cp .env.example .env.local
+   ```
+   Set `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_SUPABASE_STORAGE_BUCKET`.
+3. Start local development server:
+   ```bash
+   npm run dev
+   ```
+4. Verify types and production build:
+   ```bash
+   npm run lint
+   npm run build
+   ```
 
 ## Netlify deployment
 

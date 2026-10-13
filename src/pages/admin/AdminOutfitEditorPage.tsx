@@ -22,6 +22,7 @@ import { auth } from '../../firebase/config';
 import { getOutfitById, createOutfit, updateOutfit } from '../../firebase/services/outfits';
 import {
   getProductsByOutfitId,
+  saveProduct,
   createProduct,
   deleteProductsByOutfitId,
   deleteProductsExcept,
@@ -207,7 +208,7 @@ export const AdminOutfitEditorPage: React.FC = () => {
                   retailerLogoUrl: p.retailerLogoUrl || '',
                   isCustomRetailer: !isKnownRetailer,
                   isCustomCategory: !isKnownCategory,
-                  price: p.price ? String(p.price) : '',
+                  price: (p.price !== undefined && p.price !== null) ? String(p.price) : '',
                   currency: p.currency || 'INR',
                   affiliateUrl: p.affiliateUrl,
                   imageUrl: p.imageUrl || '',
@@ -461,6 +462,11 @@ export const AdminOutfitEditorPage: React.FC = () => {
       return;
     }
 
+    if (heroThumbnailUrl && heroThumbnailUrl.startsWith('blob:')) {
+      setErrorMsg('Cannot save temporary video thumbnail URL. Please wait for thumbnail upload to finish.');
+      return;
+    }
+
     if (!heroMediaUrl.trim()) {
       setErrorMsg('Please upload an image or video, or provide a valid Hero Media URL.');
       return;
@@ -508,11 +514,11 @@ export const AdminOutfitEditorPage: React.FC = () => {
         name: p.name.trim(),
         retailer: p.retailer.trim(),
         category: p.category?.trim() || undefined,
-        retailerLogoUrl: p.retailerLogoUrl?.trim() || undefined,
+        retailerLogoUrl: (p.retailerLogoUrl || '').trim() || undefined,
         price: parsedPrice,
         currency: p.currency || 'INR',
-        affiliateUrl: p.affiliateUrl.trim(),
-        imageUrl: p.imageUrl.trim() || undefined,
+        affiliateUrl: (p.affiliateUrl || '').trim(),
+        imageUrl: (p.imageUrl || '').trim() || undefined,
         sortOrder: idx + 1,
       });
     }
@@ -574,13 +580,25 @@ export const AdminOutfitEditorPage: React.FC = () => {
         throw new Error(`Failed to save outfit "${trimmedId}": ${msg}`);
       }
 
-      // Step 2: Save each product piece. Existing pieces are preserved and NOT wiped prematurely.
+      // Step 2: Save each product piece. Existing pieces are updated in-place (preserving createdAt),
+      // new pieces are created with fresh timestamps, avoiding ID collisions.
       const savedProductIds: string[] = [];
+      const usedIds = new Set(parsedProducts.map((p) => p.id).filter(Boolean) as string[]);
+      let counter = 1;
+
       for (let i = 0; i < parsedProducts.length; i++) {
         const p = parsedProducts[i];
-        const prodId = p.id || `${trimmedId}-P${i + 1}`;
+        let prodId = p.id;
+        if (!prodId) {
+          while (usedIds.has(`${trimmedId}-P${counter}`)) {
+            counter++;
+          }
+          prodId = `${trimmedId}-P${counter}`;
+          usedIds.add(prodId);
+        }
+
         try {
-          await createProduct(prodId, {
+          await saveProduct(prodId, {
             outfitId: trimmedId,
             name: p.name,
             retailer: p.retailer,
@@ -603,7 +621,7 @@ export const AdminOutfitEditorPage: React.FC = () => {
         }
       }
 
-      // Step 3: Only after all products are safely created/updated, prune removed pieces
+      // Step 3: Only after all products are safely saved, prune removed pieces
       if (isEditMode) {
         try {
           await deleteProductsExcept(trimmedId, savedProductIds);

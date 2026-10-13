@@ -18,8 +18,7 @@ import {
 import { Link, useNavigate } from '../../router/Router';
 import { auth } from '../../firebase/config';
 import { logOut } from '../../firebase/services/admin';
-import { getAllOutfitsAdmin, updateOutfit, createOutfit } from '../../firebase/services/outfits';
-import { createProduct, deleteProductsByOutfitId } from '../../firebase/services/products';
+import { getAllOutfitsAdmin, updateOutfit, seedEditorialPresets } from '../../firebase/services/outfits';
 import { Outfit } from '../../types/schema';
 import { SAMPLE_EDITORIAL_PRESETS } from '../../assets/sampleAssets';
 
@@ -105,26 +104,7 @@ export const AdminDashboard: React.FC = () => {
     setSeeding(true);
     setMessage('Writing editorial looks into Cloud Firestore...');
     try {
-      for (const preset of SAMPLE_EDITORIAL_PRESETS) {
-        const { products, ...outfitData } = preset;
-        await updateOutfit(preset.id, outfitData).catch(async () => {
-          await createOutfit(outfitData as any);
-        });
-
-        await deleteProductsByOutfitId(preset.id);
-        for (const p of products) {
-          await createProduct(p.id, {
-            outfitId: preset.id,
-            name: p.name,
-            retailer: p.retailer,
-            price: p.price,
-            currency: p.currency,
-            affiliateUrl: p.affiliateUrl,
-            imageUrl: p.imageUrl || null,
-            sortOrder: p.sortOrder,
-          });
-        }
-      }
+      await seedEditorialPresets(SAMPLE_EDITORIAL_PRESETS);
       setMessage('Successfully initialized curated looks into Cloud Firestore!');
       await fetchOutfits();
     } catch (err: any) {

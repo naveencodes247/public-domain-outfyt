@@ -109,7 +109,7 @@ async function runTests() {
     failures++;
   }
 
-  // Test 8: Test F - Firestore security rules contain both administrator emails
+  // Test 8: Test F - Firestore security rules contain both administrator emails and forbid bypass
   console.log('Test 8: Test F - Verify Firestore security rules isAdmin predicate');
   const rulesContent = fs.readFileSync(path.join(process.cwd(), 'firestore.rules'), 'utf-8');
   const hasRuleEmail1 = rulesContent.includes("'naveencodes247@gmail.com'");
@@ -117,12 +117,15 @@ async function runTests() {
   const hasCaseInsensitive = rulesContent.includes('request.auth.token.email.lower()');
   const hasVerifiedCheck = rulesContent.includes('request.auth.token.email_verified == true');
   const hasEmailClaimCheck = rulesContent.includes("'email' in request.auth.token");
-  const hasAdminDocCheck = rulesContent.includes('exists(/databases/$(database)/documents/admins/$(request.auth.uid))');
 
-  if (hasRuleEmail1 && hasRuleEmail2 && hasCaseInsensitive && hasVerifiedCheck && hasEmailClaimCheck && hasAdminDocCheck) {
-    console.log('  [PASS] firestore.rules strictly mandates case-insensitive (naveencodes247@gmail.com || outfyt.co.in@gmail.com) && email_verified == true and admin doc check');
+  // Ensure isAdmin predicate does not contain an OR bypass allowing admins collection alone to grant access
+  const isAdminBlock = rulesContent.match(/function isAdmin\(\)\s*\{([^}]+)\}/)?.[1] || '';
+  const hasDocBypassInIsAdmin = isAdminBlock.includes('exists(/databases/$(database)/documents/admins/') && isAdminBlock.includes('||');
+
+  if (hasRuleEmail1 && hasRuleEmail2 && hasCaseInsensitive && hasVerifiedCheck && hasEmailClaimCheck && !hasDocBypassInIsAdmin) {
+    console.log('  [PASS] firestore.rules strictly mandates case-insensitive (naveencodes247@gmail.com || outfyt.co.in@gmail.com) && email_verified == true with NO independent admins doc bypass');
   } else {
-    console.error('  [FAIL] firestore.rules missing authorized email checks');
+    console.error('  [FAIL] firestore.rules missing authorized email checks or contains bypass');
     failures++;
   }
 

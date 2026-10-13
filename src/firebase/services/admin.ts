@@ -28,20 +28,23 @@ export async function checkAdminStatus(user: User | null): Promise<AdminStatus> 
 
   const userEmail = (user.email || '').trim().toLowerCase();
 
-  // 1. Check authorized administrator email allowlist with verified email
+  // 1. Mandatory check: Account must match the approved allowlist and have a verified email.
+  // An existing document in the admins collection cannot independently bypass these requirements.
   const isAuthorizedEmail = AUTHORIZED_ADMIN_EMAILS.some(
     (adminEmail) => adminEmail.toLowerCase() === userEmail
   );
 
-  if (isAuthorizedEmail && user.emailVerified) {
+  if (!isAuthorizedEmail || !user.emailVerified) {
     return {
-      isAdmin: true,
-      role: 'super_admin',
-      reason: `Authenticated as authorized administrator (${user.email}) with verified email.`,
+      isAdmin: false,
+      role: 'none',
+      reason: isAuthorizedEmail
+        ? `Account (${user.email}) email is not verified.`
+        : `Account (${user.email || user.uid}) is not listed in administrator registry.`,
     };
   }
 
-  // 2. Check /admins/{uid} Firestore allowlist
+  // 2. Verified allowlist user: check /admins/{uid} Firestore record for role assignment
   try {
     const adminDocRef = doc(db, 'admins', user.uid);
     const snap = await getDoc(adminDocRef);
@@ -49,18 +52,18 @@ export async function checkAdminStatus(user: User | null): Promise<AdminStatus> 
       const data = snap.data();
       return {
         isAdmin: true,
-        role: data.role || 'editor',
-        reason: `Matched active record in /admins/${user.uid}`,
+        role: data.role || 'super_admin',
+        reason: `Authenticated as authorized administrator (${user.email}) with verified email and active registry record.`,
       };
     }
   } catch (err) {
-    // If permission denied or query fails, user is not admin
+    // If permission denied or query fails, default to super_admin from allowlist
   }
 
   return {
-    isAdmin: false,
-    role: 'none',
-    reason: `Account (${user.email || user.uid}) is not listed in administrator registry.`,
+    isAdmin: true,
+    role: 'super_admin',
+    reason: `Authenticated as authorized administrator (${user.email}) with verified email.`,
   };
 }
 

@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   query,
   setDoc,
@@ -66,6 +67,61 @@ export async function getProductsByOutfitId(
     return [];
   } catch (error) {
     handleFirestoreError(error, OperationType.LIST, COLLECTION_NAME);
+  }
+}
+
+/**
+ * Saves a product attached to an outfit (creating if new, updating if existing).
+ * When updating an existing product document, it uses updateDoc to preserve the original
+ * createdAt timestamp and parent outfitId, ensuring strict compliance with Firestore security rules.
+ */
+export async function saveProduct(
+  productId: string,
+  product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>
+): Promise<void> {
+  const path = `${COLLECTION_NAME}/${productId}`;
+  try {
+    const docRef = doc(db, COLLECTION_NAME, productId);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      // Document already exists: Update non-immutable fields.
+      // Do NOT touch createdAt or outfitId so incoming().createdAt == existing().createdAt passes!
+      const rawPayload: Record<string, any> = {
+        name: product.name.trim(),
+        retailer: product.retailer.trim(),
+        currency: product.currency || 'INR',
+        affiliateUrl: product.affiliateUrl.trim(),
+        sortOrder: product.sortOrder ?? 1,
+        category: product.category && typeof product.category === 'string' && product.category.trim() ? product.category.trim() : null,
+        retailerLogoUrl: product.retailerLogoUrl && typeof product.retailerLogoUrl === 'string' && product.retailerLogoUrl.trim() ? product.retailerLogoUrl.trim() : null,
+        price: typeof product.price === 'number' && !isNaN(product.price) ? product.price : null,
+        imageUrl: product.imageUrl && typeof product.imageUrl === 'string' && product.imageUrl.trim() ? product.imageUrl.trim() : null,
+        updatedAt: serverTimestamp(),
+      };
+      const payload = sanitizeFirestoreData(rawPayload);
+      await updateDoc(docRef, payload);
+    } else {
+      // Document does not exist: Create fresh with serverTimestamp() for both createdAt and updatedAt
+      const rawPayload: Record<string, any> = {
+        outfitId: product.outfitId.trim(),
+        name: product.name.trim(),
+        retailer: product.retailer.trim(),
+        currency: product.currency || 'INR',
+        affiliateUrl: product.affiliateUrl.trim(),
+        sortOrder: product.sortOrder ?? 1,
+        category: product.category && typeof product.category === 'string' && product.category.trim() ? product.category.trim() : null,
+        retailerLogoUrl: product.retailerLogoUrl && typeof product.retailerLogoUrl === 'string' && product.retailerLogoUrl.trim() ? product.retailerLogoUrl.trim() : null,
+        price: typeof product.price === 'number' && !isNaN(product.price) ? product.price : null,
+        imageUrl: product.imageUrl && typeof product.imageUrl === 'string' && product.imageUrl.trim() ? product.imageUrl.trim() : null,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+      const payload = sanitizeFirestoreData(rawPayload);
+      await setDoc(docRef, payload);
+    }
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
   }
 }
 

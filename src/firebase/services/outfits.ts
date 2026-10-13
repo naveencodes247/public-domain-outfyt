@@ -15,6 +15,7 @@ import { db } from '../config';
 import { handleFirestoreError, OperationType } from '../errors';
 import { sanitizeFirestoreData } from '../utils/cleanData';
 import { Outfit } from '../../types/schema';
+import { saveProduct } from './products';
 
 const COLLECTION_NAME = 'outfits';
 
@@ -266,3 +267,35 @@ export async function deleteOutfit(outfitId: string): Promise<void> {
     handleFirestoreError(error, OperationType.DELETE, path);
   }
 }
+
+/**
+ * Seeds or restores editorial presets into Cloud Firestore using safe saveProduct calls.
+ */
+export async function seedEditorialPresets(presets: any[]): Promise<void> {
+  for (const preset of presets) {
+    const { products, ...outfitData } = preset;
+    try {
+      await updateOutfit(preset.id, outfitData);
+    } catch {
+      await createOutfit(outfitData as any);
+    }
+
+    if (Array.isArray(products)) {
+      for (const p of products) {
+        await saveProduct(p.id, {
+          outfitId: preset.id,
+          name: p.name,
+          retailer: p.retailer,
+          category: p.category,
+          retailerLogoUrl: p.retailerLogoUrl,
+          price: p.price,
+          currency: p.currency || 'INR',
+          affiliateUrl: p.affiliateUrl,
+          imageUrl: p.imageUrl || null,
+          sortOrder: p.sortOrder || 1,
+        });
+      }
+    }
+  }
+}
+
