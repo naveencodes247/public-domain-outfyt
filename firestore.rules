@@ -18,14 +18,10 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && (
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        (
-          'email' in request.auth.token &&
-          request.auth.token.email_verified == true &&
-          request.auth.token.email.lower() in ['naveencodes247@gmail.com', 'outfyt.co.in@gmail.com']
-        )
-      );
+      return isSignedIn() &&
+        'email' in request.auth.token &&
+        request.auth.token.email_verified == true &&
+        request.auth.token.email.lower() in ['naveencodes247@gmail.com', 'outfyt.co.in@gmail.com'];
     }
 
     function isValidId(id) {

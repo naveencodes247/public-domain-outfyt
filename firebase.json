@@ -1,0 +1,15 @@
+{
+  "firestore": [
+    {
+      "database": "ai-studio-outfytcoin-f3920ea2-7315-4751-a131-cd9f6a4343b9",
+      "rules": "firestore.rules"
+    },
+    {
+      "database": "(default)",
+      "rules": "firestore.rules"
+    }
+  ],
+  "storage": {
+    "rules": "storage.rules"
+  }
+}
