@@ -14,6 +14,8 @@ export const OutfitDetailPage: React.FC = () => {
 
   const [outfit, setOutfit] = useState<Outfit | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [productsError, setProductsError] = useState<string | null>(null);
   const [relatedOutfits, setRelatedOutfits] = useState<Outfit[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -40,8 +42,21 @@ export const OutfitDetailPage: React.FC = () => {
         if (isMounted) {
           setOutfit(current);
           if (current) {
-            const items = await getProductsByOutfitId(current.id, current.slug || slug);
-            if (isMounted) setProducts(items);
+            setProductsLoading(true);
+            try {
+              const items = await getProductsByOutfitId(current.id, current.slug || slug);
+              if (isMounted) {
+                setProducts(items);
+                setProductsError(null);
+              }
+            } catch (pErr: any) {
+              console.warn('Failed to load products for outfit:', pErr);
+              if (isMounted) {
+                setProductsError('Unable to load affiliate products for this outfit right now.');
+              }
+            } finally {
+              if (isMounted) setProductsLoading(false);
+            }
 
             const allPublished = await getPublishedOutfits();
             if (isMounted) {
@@ -276,12 +291,29 @@ export const OutfitDetailPage: React.FC = () => {
                   SHOP THE LOOK
                 </h2>
               </div>
-              <span className="text-xs text-[#66615B]">
-                {products.length} {products.length === 1 ? 'piece' : 'pieces'} curated
-              </span>
+              {!productsLoading && !productsError && (
+                <span className="text-xs text-[#66615B]">
+                  {products.length} {products.length === 1 ? 'piece' : 'pieces'} curated
+                </span>
+              )}
             </div>
 
-            {products.length > 0 ? (
+            {productsLoading ? (
+              <div className="space-y-3 animate-pulse">
+                <div className="h-28 bg-[#FFFFFF] rounded-2xl border border-[#E5DDD0] p-4 flex gap-4">
+                  <div className="w-20 sm:w-24 h-full bg-[#EFE6D8] rounded-xl shrink-0" />
+                  <div className="flex-1 space-y-2 py-2">
+                    <div className="h-4 bg-[#EFE6D8] rounded w-3/4" />
+                    <div className="h-3 bg-[#EFE6D8] rounded w-1/2" />
+                    <div className="h-4 bg-[#EFE6D8] rounded w-1/4 mt-4" />
+                  </div>
+                </div>
+              </div>
+            ) : productsError ? (
+              <div className="p-6 text-center rounded-xl bg-amber-50/60 border border-amber-200 text-xs text-amber-800">
+                {productsError}
+              </div>
+            ) : products.length > 0 ? (
               <div className="space-y-3">
                 {products.map((product) => (
                   <ProductCard
