@@ -20,7 +20,11 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && (
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        (request.auth.token.email == 'naveencodes247@gmail.com' && request.auth.token.email_verified == true)
+        (
+          'email' in request.auth.token &&
+          request.auth.token.email_verified == true &&
+          request.auth.token.email.lower() in ['naveencodes247@gmail.com', 'outfyt.co.in@gmail.com']
+        )
       );
     }
 
@@ -46,10 +50,10 @@ service cloud.firestore {
         && data.description is string && data.description.size() <= 2000
         && data.category is string && data.category.size() >= 2 && data.category.size() <= 50
         && data.tags is list && data.tags.size() <= 10 && (data.tags.size() == 0 || data.tags[0] is string)
-        && (data.heroImageUrl == null || (data.heroImageUrl is string && data.heroImageUrl.size() <= 1000))
-        && (data.heroMediaUrl == null || (data.heroMediaUrl is string && data.heroMediaUrl.size() <= 1000))
+        && (data.heroImageUrl == null || (data.heroImageUrl is string && data.heroImageUrl.size() <= 2048))
+        && (data.heroMediaUrl == null || (data.heroMediaUrl is string && data.heroMediaUrl.size() <= 2048))
         && (data.heroMediaType == null || data.heroMediaType in ['image', 'video'])
-        && (data.heroThumbnailUrl == null || (data.heroThumbnailUrl is string && data.heroThumbnailUrl.size() <= 1000))
+        && (data.heroThumbnailUrl == null || (data.heroThumbnailUrl is string && data.heroThumbnailUrl.size() <= 2048))
         && (data.heroMediaAlt == null || (data.heroMediaAlt is string && data.heroMediaAlt.size() <= 200))
         && data.status in ['draft', 'published', 'archived']
         && (data.publishedAt == null || data.publishedAt is timestamp);
@@ -66,7 +70,7 @@ service cloud.firestore {
         && (data.retailerLogoUrl == null || (data.retailerLogoUrl is string && data.retailerLogoUrl.size() <= 1000))
         && (data.price == null || data.price is number)
         && data.currency is string && data.currency.size() == 3
-        && data.affiliateUrl is string && data.affiliateUrl.size() <= 1000
+        && data.affiliateUrl is string && data.affiliateUrl.size() <= 2048
         && (data.imageUrl == null || (data.imageUrl is string && data.imageUrl.size() <= 1000))
         && data.sortOrder is number;
     }
@@ -86,6 +90,21 @@ service cloud.firestore {
         && data.keys().hasOnly(['email', 'role', 'createdAt'])
         && data.email is string && data.email.size() <= 120
         && data.role in ['super_admin', 'editor'];
+    }
+
+    // Validation helper for Category
+    function isValidCategory(data) {
+      return data.keys().hasAll(['id', 'name', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'name', 'group', 'description', 'tagline', 'accent', 'imageUrl', 'isCustom', 'archived', 'createdAt', 'updatedAt'])
+        && data.id is string && data.id.size() >= 2 && data.id.size() <= 64
+        && data.name is string && data.name.size() >= 2 && data.name.size() <= 60
+        && (data.group == null || (data.group is string && data.group.size() <= 40))
+        && (data.description == null || (data.description is string && data.description.size() <= 1000))
+        && (data.tagline == null || (data.tagline is string && data.tagline.size() <= 200))
+        && (data.accent == null || (data.accent is string && data.accent.size() <= 100))
+        && (data.imageUrl == null || (data.imageUrl is string && data.imageUrl.size() <= 1000))
+        && (data.isCustom == null || data.isCustom is bool)
+        && (data.archived == null || data.archived is bool);
     }
 
     // ----------------------------------------------------
@@ -173,6 +192,30 @@ service cloud.firestore {
       allow create: if isValidId(adminId) && isAdmin() && isValidAdmin(incoming()) && incoming().createdAt == request.time;
       allow update: if isValidId(adminId) && isAdmin() && isValidAdmin(incoming()) && incoming().createdAt == existing().createdAt;
       allow delete: if isValidId(adminId) && isAdmin();
+    }
+
+    // ----------------------------------------------------
+    // Collection: categories
+    // ----------------------------------------------------
+    match /categories/{categoryId} {
+      // Public visitors can list and read categories
+      allow get, list: if true;
+
+      // Creation, update and removal strictly restricted to verified OutFyt administrators
+      allow create: if isValidId(categoryId)
+        && isAdmin()
+        && isValidCategory(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isValidId(categoryId)
+        && isAdmin()
+        && isValidCategory(incoming())
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time;
+
+      allow delete: if isValidId(categoryId) && isAdmin();
     }
   }
 }

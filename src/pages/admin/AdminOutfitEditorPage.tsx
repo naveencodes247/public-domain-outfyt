@@ -24,6 +24,7 @@ import {
   getProductsByOutfitId,
   createProduct,
   deleteProductsByOutfitId,
+  deleteProductsExcept,
 } from '../../firebase/services/products';
 import { uploadOutfitMedia, validateMediaFile } from '../../firebase/services/storage';
 import {
@@ -466,6 +467,7 @@ export const AdminOutfitEditorPage: React.FC = () => {
     }
 
     const parsedProducts: Array<{
+      id?: string;
       name: string;
       retailer: string;
       category?: string;
@@ -502,6 +504,7 @@ export const AdminOutfitEditorPage: React.FC = () => {
       }
 
       parsedProducts.push({
+        id: p.id,
         name: p.name.trim(),
         retailer: p.retailer.trim(),
         category: p.category?.trim() || undefined,
@@ -519,9 +522,14 @@ export const AdminOutfitEditorPage: React.FC = () => {
       return;
     }
 
-    for (const p of parsedProducts) {
+    for (let idx = 0; idx < parsedProducts.length; idx++) {
+      const p = parsedProducts[idx];
       if (!p.affiliateUrl.startsWith('http://') && !p.affiliateUrl.startsWith('https://')) {
-        setErrorMsg(`Product "${p.name}" has an invalid affiliate URL (must start with https:// or http://).`);
+        setErrorMsg(`Piece #${idx + 1} ("${p.name}") has an invalid affiliate URL (must start with https:// or http://).`);
+        return;
+      }
+      if (p.affiliateUrl.length > 2048) {
+        setErrorMsg(`Piece #${idx + 1} ("${p.name}") affiliate URL is too long (${p.affiliateUrl.length} characters). Maximum allowed is 2048 characters.`);
         return;
       }
     }
@@ -550,28 +558,58 @@ export const AdminOutfitEditorPage: React.FC = () => {
         status: finalStatus,
       };
 
-      if (isEditMode) {
-        await updateOutfit(trimmedId, outfitPayload);
-        await deleteProductsByOutfitId(trimmedId);
-      } else {
-        await createOutfit(outfitPayload);
+      // Step 1: Save or update the parent outfit document first
+      try {
+        if (isEditMode) {
+          await updateOutfit(trimmedId, outfitPayload);
+        } else {
+          await createOutfit(outfitPayload);
+        }
+      } catch (outfitErr: any) {
+        let msg = outfitErr.message || String(outfitErr);
+        try {
+          const parsed = JSON.parse(outfitErr.message);
+          if (parsed && parsed.error) msg = parsed.error;
+        } catch {}
+        throw new Error(`Failed to save outfit "${trimmedId}": ${msg}`);
       }
 
+      // Step 2: Save each product piece. Existing pieces are preserved and NOT wiped prematurely.
+      const savedProductIds: string[] = [];
       for (let i = 0; i < parsedProducts.length; i++) {
         const p = parsedProducts[i];
-        const prodId = `${trimmedId}-P${i + 1}`;
-        await createProduct(prodId, {
-          outfitId: trimmedId,
-          name: p.name,
-          retailer: p.retailer,
-          category: p.category,
-          retailerLogoUrl: p.retailerLogoUrl,
-          price: p.price,
-          currency: p.currency,
-          affiliateUrl: p.affiliateUrl,
-          imageUrl: p.imageUrl || null,
-          sortOrder: p.sortOrder,
-        });
+        const prodId = p.id || `${trimmedId}-P${i + 1}`;
+        try {
+          await createProduct(prodId, {
+            outfitId: trimmedId,
+            name: p.name,
+            retailer: p.retailer,
+            category: p.category,
+            retailerLogoUrl: p.retailerLogoUrl,
+            price: p.price,
+            currency: p.currency,
+            affiliateUrl: p.affiliateUrl,
+            imageUrl: p.imageUrl || null,
+            sortOrder: p.sortOrder,
+          });
+          savedProductIds.push(prodId);
+        } catch (prodErr: any) {
+          let msg = prodErr.message || String(prodErr);
+          try {
+            const parsed = JSON.parse(prodErr.message);
+            if (parsed && parsed.error) msg = parsed.error;
+          } catch {}
+          throw new Error(`Failed to save piece #${i + 1} ("${p.name}"): ${msg}`);
+        }
+      }
+
+      // Step 3: Only after all products are safely created/updated, prune removed pieces
+      if (isEditMode) {
+        try {
+          await deleteProductsExcept(trimmedId, savedProductIds);
+        } catch (cleanupErr: any) {
+          console.warn('Non-fatal cleanup warning for removed products:', cleanupErr);
+        }
       }
 
       setMediaStatus(finalStatus === 'published' ? 'published' : 'saved');
@@ -580,17 +618,7 @@ export const AdminOutfitEditorPage: React.FC = () => {
         navigate('/admin/outfits');
       }, 1500);
     } catch (err: any) {
-      let friendlyError = err.message || 'An error occurred while saving.';
-      // Parse JSON from handleFirestoreError if present
-      try {
-        const parsedJson = JSON.parse(err.message);
-        if (parsedJson && parsedJson.error) {
-          friendlyError = parsedJson.error;
-        }
-      } catch {
-        // Not a JSON string, retain friendly message
-      }
-      setErrorMsg(`Failed to save outfit: ${friendlyError}`);
+      setErrorMsg(err.message || 'An error occurred while saving.');
     } finally {
       setSaving(false);
     }

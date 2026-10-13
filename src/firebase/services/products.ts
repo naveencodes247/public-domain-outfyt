@@ -175,3 +175,24 @@ export async function deleteProductsByOutfitId(outfitId: string): Promise<void> 
     handleFirestoreError(error, OperationType.DELETE, COLLECTION_NAME);
   }
 }
+
+/**
+ * Safely removes products belonging to an outfit that are NOT present in keepProductIds.
+ * Ensures existing pieces are preserved if new product creation fails.
+ */
+export async function deleteProductsExcept(
+  outfitId: string,
+  keepProductIds: string[]
+): Promise<void> {
+  try {
+    const existingProducts = await getProductsByOutfitId(outfitId);
+    for (const p of existingProducts) {
+      if (p.id && !keepProductIds.includes(p.id)) {
+        await deleteDoc(doc(db, COLLECTION_NAME, p.id));
+      }
+    }
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, COLLECTION_NAME);
+  }
+}
+

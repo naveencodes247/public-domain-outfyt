@@ -21,8 +21,9 @@ service cloud.firestore {
       return isSignedIn() && (
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
         (
-          (request.auth.token.email == 'naveencodes247@gmail.com' || request.auth.token.email == 'outfyt.co.in@gmail.com') &&
-          request.auth.token.email_verified == true
+          'email' in request.auth.token &&
+          request.auth.token.email_verified == true &&
+          request.auth.token.email.lower() in ['naveencodes247@gmail.com', 'outfyt.co.in@gmail.com']
         )
       );
     }
@@ -49,10 +50,10 @@ service cloud.firestore {
         && data.description is string && data.description.size() <= 2000
         && data.category is string && data.category.size() >= 2 && data.category.size() <= 50
         && data.tags is list && data.tags.size() <= 10 && (data.tags.size() == 0 || data.tags[0] is string)
-        && (data.heroImageUrl == null || (data.heroImageUrl is string && data.heroImageUrl.size() <= 1000))
-        && (data.heroMediaUrl == null || (data.heroMediaUrl is string && data.heroMediaUrl.size() <= 1000))
+        && (data.heroImageUrl == null || (data.heroImageUrl is string && data.heroImageUrl.size() <= 2048))
+        && (data.heroMediaUrl == null || (data.heroMediaUrl is string && data.heroMediaUrl.size() <= 2048))
         && (data.heroMediaType == null || data.heroMediaType in ['image', 'video'])
-        && (data.heroThumbnailUrl == null || (data.heroThumbnailUrl is string && data.heroThumbnailUrl.size() <= 1000))
+        && (data.heroThumbnailUrl == null || (data.heroThumbnailUrl is string && data.heroThumbnailUrl.size() <= 2048))
         && (data.heroMediaAlt == null || (data.heroMediaAlt is string && data.heroMediaAlt.size() <= 200))
         && data.status in ['draft', 'published', 'archived']
         && (data.publishedAt == null || data.publishedAt is timestamp);
@@ -69,7 +70,7 @@ service cloud.firestore {
         && (data.retailerLogoUrl == null || (data.retailerLogoUrl is string && data.retailerLogoUrl.size() <= 1000))
         && (data.price == null || data.price is number)
         && data.currency is string && data.currency.size() == 3
-        && data.affiliateUrl is string && data.affiliateUrl.size() <= 1000
+        && data.affiliateUrl is string && data.affiliateUrl.size() <= 2048
         && (data.imageUrl == null || (data.imageUrl is string && data.imageUrl.size() <= 1000))
         && data.sortOrder is number;
     }
