@@ -112,12 +112,15 @@ async function runTests() {
   // Test 8: Test F - Firestore security rules contain both administrator emails
   console.log('Test 8: Test F - Verify Firestore security rules isAdmin predicate');
   const rulesContent = fs.readFileSync(path.join(process.cwd(), 'firestore.rules'), 'utf-8');
-  const hasRuleEmail1 = rulesContent.includes("request.auth.token.email == 'naveencodes247@gmail.com'");
-  const hasRuleEmail2 = rulesContent.includes("request.auth.token.email == 'outfyt.co.in@gmail.com'");
+  const hasRuleEmail1 = rulesContent.includes("'naveencodes247@gmail.com'");
+  const hasRuleEmail2 = rulesContent.includes("'outfyt.co.in@gmail.com'");
+  const hasCaseInsensitive = rulesContent.includes('request.auth.token.email.lower()');
   const hasVerifiedCheck = rulesContent.includes('request.auth.token.email_verified == true');
+  const hasEmailClaimCheck = rulesContent.includes("'email' in request.auth.token");
+  const hasAdminDocCheck = rulesContent.includes('exists(/databases/$(database)/documents/admins/$(request.auth.uid))');
 
-  if (hasRuleEmail1 && hasRuleEmail2 && hasVerifiedCheck) {
-    console.log('  [PASS] firestore.rules strictly mandates (naveencodes247@gmail.com || outfyt.co.in@gmail.com) && email_verified == true');
+  if (hasRuleEmail1 && hasRuleEmail2 && hasCaseInsensitive && hasVerifiedCheck && hasEmailClaimCheck && hasAdminDocCheck) {
+    console.log('  [PASS] firestore.rules strictly mandates case-insensitive (naveencodes247@gmail.com || outfyt.co.in@gmail.com) && email_verified == true and admin doc check');
   } else {
     console.error('  [FAIL] firestore.rules missing authorized email checks');
     failures++;
